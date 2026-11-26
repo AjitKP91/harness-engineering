@@ -14,9 +14,9 @@ Modern LLMs can request **multiple tool calls in a single turn**, and a well-eng
 
 ## 1. The Simple Idea (Zero-Jargon Intuition)
 
-Think back to our **Chef in a Locked Room** from Chapter 00—now upgraded to a busy restaurant kitchen.
+Imagine a busy restaurant kitchen with one head chef and a small kitchen crew.
 
-Suppose the chef slips a single order ticket under the door with five items on it:
+Suppose the head chef hands over a single order ticket with five items on it:
 1. Check how many eggs are in the fridge.
 2. Check whether we have fresh basil.
 3. Check the oven temperature.

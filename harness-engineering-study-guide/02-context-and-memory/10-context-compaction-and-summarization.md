@@ -12,7 +12,7 @@ You cannot just stop the session, and you cannot keep appending forever—soon t
 
 ## 1. The Simple Idea (Zero-Jargon Intuition)
 
-Imagine a surgeon performing a six-hour operation—or our **chef in a locked room** from Chapter 00 working through a twelve-course banquet.
+Imagine a surgeon performing a six-hour operation—or a head chef working through a twelve-course banquet.
 
 Early in the shift, the chef's desk starts out clean. By hour three, it is buried under 80 old ingredient lists, scratched-out sauce experiments, grocery receipts from dishes that were already served, and sticky notes from two hours ago. Even though the desk is huge, the chef keeps misplacing the recipe for the *current* course under piles of stale paper.
 

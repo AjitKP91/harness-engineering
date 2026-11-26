@@ -14,22 +14,22 @@ If compaction is the cleanup crew inside the room, **tool output truncation and 
 
 ## 1. The Simple Idea (Zero-Jargon Intuition)
 
-Go back to our **chef in a locked room** from Chapter 00.
+Go back to our **Remote Specialist on a Phone Call** from Chapter 00.
 
-Suppose the chef slips a note under the door: *"Check the freezer inventory and tell me if we're out of butter."*
+Suppose the specialist asks the on-site engineer: *"Run the test suite and tell me why checkout failed."*
 
-Now imagine the kitchen assistant walks to the warehouse, prints out a **600-page spreadsheet** listing every single carrot, fork, napkin, and spice jar in the building—complete with neon highlighter marks and 200 pages of barcode gibberish—and tries to shove the entire binder through the tiny mail slot.
+Now imagine the test runner spits out a **600-page log** listing 18,000 passing tests, noisy terminal color codes, and 200 pages of webpack output—and the on-site engineer tries to read all 600 pages out loud over the phone.
 
-The mail slot jams. Even if the pages squeeze through, the chef's desk is buried under paper and the one line that says `BUTTER: 0 UNITS (OUT OF STOCK)` is hidden on page 598.
+The call grinds to a halt. The specialist's notepad fills up, and the single line that actually matters—`FAIL tests/checkout.py: AssertionError: expected 200, got 500` on page 598—gets buried in noise.
 
-What does a *great* assistant do instead?
+What does a *great* on-site engineer do instead?
 
-1. **Filters out garbage first:** Strips out barcode gibberish and decorative formatting.
-2. **Files the full binder on a labeled shelf:** Puts the complete 600-page printout into `Binder #14` in the kitchen so **nothing is ever thrown away**.
-3. **Slides a crisp one-page preview through the mail slot:**
-   - The summary header: *"600 pages total (18,400 items). Full sheet filed in `Binder #14`."*
-   - The **top** lines (headers & initial context) and the **bottom** lines (final totals & out-of-stock warnings).
-   - A note: *"If you want to check any specific item in the middle, just ask me to search or read specific pages from `Binder #14`."*
+1. **Filters out garbage first:** Strips terminal color codes and decorative noise.
+2. **Saves the full log to a labeled file on disk:** Writes the complete 600-page output to `logs/run-14.txt` so **nothing is ever thrown away**.
+3. **Reads back a crisp one-page preview over the phone:**
+   - The summary header: *"600 pages total (18,400 lines). Full log saved to `logs/run-14.txt`."*
+   - The **top** lines (command header & initial setup) and the **bottom** lines (final stack trace & exit code).
+   - A note: *"If you want to inspect any lines in the middle, just ask me to search or read specific line ranges from `logs/run-14.txt`."*
 
 That three-step habit is **content-aware filtering + head/tail truncation + artifact offloading**.
 

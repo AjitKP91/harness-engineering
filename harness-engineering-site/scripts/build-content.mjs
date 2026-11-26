@@ -205,6 +205,50 @@ for (const lab of LABS) {
 // Also embed Context Tank lab inside Chapter 10!
 LABS_BY_CHAPTER.set('10-context-compaction-and-summarization', ['context-compaction']);
 
+const CHAPTER_SUMMARIES = {
+  '00': 'Learn what an LLM actually is, why raw models fail at real coding tasks, and how the 7 layers of an agent harness turn text prediction into autonomous engineering.',
+  '01': 'Build the core ReAct tool-use loop: manage stateless conversation arrays, handle API stop reasons, support mid-loop user steering, and enforce turn budgets.',
+  '02': 'Stream responses over SSE for instant feedback, incrementally reassemble tool-call JSON deltas, separate thinking from text, and recover from mid-stream disconnects.',
+  '03': 'Design crisp JSON Schema tool APIs, write descriptions that act as micro-prompts, enforce constrained structured outputs, and avoid tool-bloat confusion.',
+  '04': 'Execute read-only tool calls concurrently while serializing state-changing writes, matching tool_use_id results cleanly, and propagating timeouts and cancellations.',
+  '05': 'Distinguish API outages from tool errors, apply jittered backoff, turn failures into actionable model feedback, and break infinite doom loops automatically.',
+  '06': 'Replace brittle while loops with an explicit session state machine that handles approvals, clean Ctrl+C interrupts, message-pair repair, and crash-safe persistence.',
+  '07': 'Assemble system prompts with clear instruction precedence, discover hierarchical AGENTS.md/CLAUDE.md repo rules, and prevent instruction drift over long sessions.',
+  '08': 'Understand how KV prefix caching cuts input costs up to 90%, avoid subtle cache-busters like live timestamps or shuffled tools, and monitor hit rates.',
+  '09': 'Master tokenization, combat context rot, partition your token budget with output headroom, and trigger graduated pruning before hitting hard API ceilings.',
+  '10': 'Keep multi-hour sessions sharp using two-tier compaction: clear stale tool outputs first, then run structured LLM summarization without breaking tool-call pairs.',
+  '11': 'Prevent single noisy commands from flooding your context window using ANSI stripping, head/tail truncation, and disk artifact offloading with on-demand reads.',
+  '12': 'Eliminate upfront prompt and tool bloat with progressive disclosure: load tiny SKILL.md metadata indexes first and fetch full instructions or tools on demand.',
+  '13': 'Design working, episodic, and semantic memory using inspectable Markdown files or databases while managing deduplication, scoping, privacy, and staleness.',
+  '14': 'Build reliable file tools with line-numbered paginated reads, surgical diff/search-replace patching, CRLF/encoding preservation, stale-read checks, and atomic writes.',
+  '15': 'Combine fast gitignore-aware globbing, ripgrep lexical search, and hybrid semantic ranking to navigate massive codebases without stale index lag.',
+  '16': 'Use Tree-sitter AST outlines and live Language Server Protocol (LSP) symbol lookup plus real-time compiler diagnostics to give agents instant type feedback.',
+  '17': 'Choose between stateless exec and persistent PTYs, prevent interactive prompt hangs with non-interactive env vars, and reap entire process groups cleanly.',
+  '18': 'Auto-background slow builds and long-lived dev servers using wait budgets, ring-buffered logs, reactive completion wakeups, and guaranteed session cleanup.',
+  '19': 'Implement a Model Context Protocol (MCP) client supporting all six primitives, stdio and Streamable HTTP transports, OAuth 2.1 security, and deferred tool loading.',
+  '20': 'Give agents real browser eyes via Playwright/CDP using compact Accessibility Trees and screenshots, capturing console/network telemetry inside strict origin guards.',
+  '21': 'Enforce kernel-level isolation using macOS Seatbelt, Linux Bubblewrap/Landlock/seccomp, containers, and hardware microVMs so safety relies on physics, not prompts.',
+  '22': 'Lock down workspaces with read-only mounts, canonical symlink checks, sensitive-path blocks, offline-by-default networking, and domain-allowlisted egress proxies.',
+  '23': 'Balance speed and safety with tiered approval policies, shell AST command parsing that catches subshells and pipes, clear approval UX, and policy-as-code.',
+  '24': 'Defend against direct and indirect prompt injection by breaking the Lethal Trifecta with privilege separation, delimiters, taint tracking, and deterministic gates.',
+  '25': 'Stop API keys and tokens from leaking via env scrubbing, zero-secret proxy credential injection, multi-layer output redaction, and short-lived scoped credentials.',
+  '26': 'Spawn isolated child subagents with focused briefs, scoped tools, and tiered models so noisy exploration stays out of the parent agent\'s context window.',
+  '27': 'Let multiple agents edit code in parallel without collisions using Git worktrees and copy-on-write clones, managing build caches, ports, merges, and cleanup.',
+  '28': 'Coordinate asynchronous agents with actor mailboxes, typed message envelopes, zero-token reactive wakeups, and deadlock-free bidirectional clarification.',
+  '29': 'Compare Coordinator-Worker, Pipeline, Shared Board, and Generator-Evaluator topologies, enforce file ownership boundaries, and know when swarms beat single agents.',
+  '30': 'Separate read-only planning from code execution using human approval gates, compaction-proof live task checklists, and disciplined mid-task re-planning.',
+  '31': 'Wrap targeted LLM calls inside deterministic Python/code pipelines for reliable fan-out/fan-in processing, concurrency limits, structured contracts, and partial recovery.',
+  '32': 'Attach deterministic lifecycle hooks (PreToolUse, PostToolUse, BeforeModel, Stop) to log, validate, auto-format, mutate inputs, or block risky actions cleanly.',
+  '33': 'Design layered enterprise-to-local config precedence, namespaced plugin bundles, hot-reload boundaries, and content-hashed trust gates for cloned repo configs.',
+  '34': 'Render responsive terminal UIs with flicker-free streaming markdown, syntax-highlighted diffs, decoupled event streams, and scriptable headless JSON CI mode.',
+  '35': 'Split core agent daemons from thin CLI/IDE/Web clients over JSON-RPC 2.0 and the Agent Client Protocol (ACP) for reconnectable, crash-isolated sessions.',
+  '36': 'Build instant workspace and conversation rewind using shadow Git tree snapshots, coupled state rollback, garbage collection, and guards for irreversible actions.',
+  '37': 'Capture every turn in append-only JSONL transcripts with secret redaction and content offloading to enable deterministic VCR-style replay and offline debugging.',
+  '38': 'Instrument agent traces and spans with OpenTelemetry GenAI conventions, normalize provider cache/reasoning token billing, and enforce runaway-spend kill switches.',
+  '39': 'Abstract multiple LLM vendors, route tasks across model tiers, handle 429/529 outages with cache-sticky failover, and survive cross-model thinking-block handoffs.',
+  '40': 'Replace vibes-based testing with containerized benchmark harnesses (SWE-bench, Terminal-Bench), multi-layer grading, pass@k vs. pass^k reliability math, and CI gates.',
+};
+
 function slugifyHeading(text) {
   return text
     .toLowerCase()
@@ -521,22 +565,23 @@ async function main() {
     const words = bodyMd.trim().split(/\s+/).length;
     totalWords += words;
 
-    // Extract clean first intro paragraph for card summary
+    // Extract fallback intro paragraph if a curated summary isn't defined
     const bodyLines = bodyMd.split(/\r?\n/);
-    let summary = '';
+    let fallbackSummary = '';
     for (const bl of bodyLines) {
       const t = bl.trim();
       if (!t || t.startsWith('#') || t.startsWith('---') || t.startsWith('```') || t.startsWith('>') || t.startsWith('|')) {
-        if (summary) break;
+        if (fallbackSummary) break;
         continue;
       }
-      summary = summary ? `${summary} ${t}` : t;
-      if (summary.length > 180) break;
+      fallbackSummary = fallbackSummary ? `${fallbackSummary} ${t}` : t;
+      if (fallbackSummary.length > 180) break;
     }
-    summary = stripInlineMarkdown(summary);
-    if (summary.length > 185) {
-      summary = `${summary.slice(0, 182).trimEnd()}…`;
+    fallbackSummary = stripInlineMarkdown(fallbackSummary);
+    if (fallbackSummary.length > 185) {
+      fallbackSummary = `${fallbackSummary.slice(0, 182).trimEnd()}…`;
     }
+    const summary = CHAPTER_SUMMARIES[num] ?? fallbackSummary;
 
     const { html, headings } = renderMarkdown(bodyMd, absPath, true);
     const prevSlug = i > 0 ? path.basename(CHAPTER_FILES[i - 1], '.md') : null;

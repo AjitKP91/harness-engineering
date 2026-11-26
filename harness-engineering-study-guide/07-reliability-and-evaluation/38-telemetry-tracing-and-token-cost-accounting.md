@@ -17,7 +17,7 @@ You cannot answer those questions by reading individual `.jsonl` files one by on
 
 ## 1. The Simple Idea (Zero-Jargon Intuition)
 
-Think of running a busy commercial restaurant kitchen (our chef analogy from *Ch. 00*, now scaled up to a chain of 50 restaurants):
+Think of running a busy commercial restaurant kitchen (scaled up to a chain of 50 restaurants):
 
 - A **transcript** *(Ch. 37)* is the security camera footage of one specific dinner order. Great for investigating a complaint.
 - **Distributed Tracing** is a **color-coded stopwatch timeline** showing that Order #482 took 18 minutes total: 2 min taking the order, 11 min waiting on the grill, 3 min plating, and 2 min waiting on a runner. Instantly, you see the bottleneck is the grill—not the waiter.

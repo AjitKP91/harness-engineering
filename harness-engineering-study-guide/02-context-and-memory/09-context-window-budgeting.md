@@ -14,7 +14,7 @@ This chapter teaches you how to measure, partition, and police your context wind
 
 ## 1. The Simple Idea: A Chef's Prep Counter
 
-Picture our chef from Chapter 00 working at a kitchen prep counter that is **10 feet wide**.
+Picture a chef working at a kitchen prep counter that is **10 feet wide**.
 
 - You would **never** cover all 10 feet of the counter with spice jars, dirty bowls, and unopened grocery bags. Why? Two reasons:
   1. **You need empty workspace to cook.** If 100% of the counter is covered with ingredients, there is zero room left to set down a cutting board and plate the meal! (In an LLM, that empty space is **output & thinking headroom**.)

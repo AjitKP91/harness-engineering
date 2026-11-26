@@ -27,7 +27,7 @@ Every topic guide follows the same humane, beginner-friendly progression:
 - [x] **00. Start Here: What Is an Agent Harness?** (`00-foundations/00-start-here-what-is-an-agent-harness.md`)
   - What an LLM actually is (stateless text-in, text-out function)
   - Tokens, context windows, and why raw LLMs cannot touch your computer
-  - The "Chef in a Locked Room" mental model of a harness
+  - The "Remote Specialist on a Phone Call" mental model of a harness
   - The 7 layers of a modern coding-agent harness
   - How a single user request travels through a harness from start to finish
 
