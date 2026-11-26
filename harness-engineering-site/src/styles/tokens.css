@@ -1,0 +1,85 @@
+:root {
+  color-scheme: light dark;
+
+  &:has(> head > meta[name="color-scheme"][content="dark"]) {
+    color-scheme: dark;
+  }
+  &:has(> head > meta[name="color-scheme"][content="light"]) {
+    color-scheme: light;
+  }
+
+  /* Typography */
+  --font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Surface & Text Palette (Warm Archival Light / Deep Obsidian Blueprint Dark) */
+  --bg: light-dark(#faf8f4, #0b0e14);
+  --bg-elevated: light-dark(#ffffff, #131822);
+  --bg-muted: light-dark(#f1ede4, #1a2130);
+  --bg-subtle: light-dark(#f6f3ec, #10151e);
+  --bg-code: light-dark(#f6f4ef, #111620);
+
+  --ink: light-dark(#181715, #f1ede6);
+  --ink-secondary: light-dark(#4e4a44, #b7b3ab);
+  --ink-muted: light-dark(#767067, #8b8780);
+
+  --border: light-dark(rgba(24, 23, 21, 0.11), rgba(241, 237, 230, 0.11));
+  --border-strong: light-dark(rgba(24, 23, 21, 0.2), rgba(241, 237, 230, 0.2));
+
+  --accent: light-dark(#c85a17, #f59e0b);
+  --accent-soft: light-dark(rgba(200, 90, 23, 0.11), rgba(245, 158, 11, 0.14));
+  --accent-ink: light-dark(#ffffff, #111318);
+
+  --teal: light-dark(#0f766e, #2dd4bf);
+  --teal-soft: light-dark(rgba(15, 118, 110, 0.1), rgba(45, 212, 191, 0.14));
+
+  --success: light-dark(#15803d, #4ade80);
+  --success-soft: light-dark(rgba(21, 128, 61, 0.11), rgba(74, 222, 128, 0.14));
+  --warning: light-dark(#b45309, #fbbf24);
+  --warning-soft: light-dark(rgba(180, 83, 9, 0.12), rgba(251, 191, 36, 0.14));
+  --danger: light-dark(#b91c1c, #f87171);
+  --danger-soft: light-dark(rgba(185, 28, 28, 0.11), rgba(248, 113, 113, 0.15));
+
+  /* Module Accents */
+  --mod-0: light-dark(#6d4aff, #a78bfa);
+  --mod-1: light-dark(#c85a17, #fb923c);
+  --mod-2: light-dark(#0f766e, #2dd4bf);
+  --mod-3: light-dark(#2563eb, #60a5fa);
+  --mod-4: light-dark(#be123c, #fb7185);
+  --mod-5: light-dark(#7c3aed, #c084fc);
+  --mod-6: light-dark(#0e7490, #22d3ee);
+  --mod-7: light-dark(#15803d, #4ade80);
+
+  /* Elevation & Radii */
+  --shadow-sm: light-dark(0 1px 2px rgba(20, 18, 15, 0.05), 0 1px 2px rgba(0, 0, 0, 0.35));
+  --shadow-md: light-dark(0 8px 24px rgba(20, 18, 15, 0.08), 0 10px 28px rgba(0, 0, 0, 0.45));
+  --shadow-lg: light-dark(0 20px 54px rgba(20, 18, 15, 0.15), 0 24px 64px rgba(0, 0, 0, 0.65));
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+
+  --header-h: 64px;
+  --prose-max: 74ch;
+}
+
+/* Shiki Dual-Theme Support (respects both OS preference and <meta name="color-scheme"> override) */
+.shiki,
+.shiki span {
+  color: var(--shiki-light);
+  background-color: transparent !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(:has(> head > meta[name="color-scheme"][content="light"])) .shiki,
+  :root:not(:has(> head > meta[name="color-scheme"][content="light"])) .shiki span {
+    color: var(--shiki-dark);
+  }
+}
+
+:root:has(> head > meta[name="color-scheme"][content="dark"]) .shiki,
+:root:has(> head > meta[name="color-scheme"][content="dark"]) .shiki span {
+  color: var(--shiki-dark);
+}
