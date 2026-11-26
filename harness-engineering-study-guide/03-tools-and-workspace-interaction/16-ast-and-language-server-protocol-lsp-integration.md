@@ -66,7 +66,7 @@ sequenceDiagram
     Harness->>LSP: notification textDocument/didOpen or didChange
     LSP-->>Harness: notification textDocument/publishDiagnostics (errors/warnings)
     Harness->>Harness: Wait debounce (150ms, max 3s) & filter new errors
-    Harness-->>LLM: "Edit applied + 1 Type Error at line 48: Type 'string' not assignable to 'number'"
+    Harness-->>LLM: "Edit applied + 1 Error [TS2345] at line 48: Argument of type 'string' not assignable to 'number'"
     LLM->>Harness: edit_file("src/billing.ts", fix_old, fix_new)
 ```
 

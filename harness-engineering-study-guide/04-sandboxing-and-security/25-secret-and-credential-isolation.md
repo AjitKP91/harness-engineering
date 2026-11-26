@@ -240,9 +240,9 @@ What about a custom internal API token with no standard prefix, like `X-Internal
 
 **Shannon entropy** measures how "random" (unpredictable) a string of characters is, in bits per character:
 - Normal English words or identifiers (`calculate_user_invoice`): low entropy (~3.0–3.8 bits/char).
-- Randomly generated secrets (Base64/hex tokens): high entropy (~4.5–5.8 bits/char).
+- Randomly generated secrets: **Base64 / URL-safe alphanumeric tokens** reach ~4.5–5.9 bits/char, while **hexadecimal keys** cap at $\log_2(16) = 4.0$ bits/char (~3.7–4.0 bits/char).
 
-**Crucial trick:** Never run raw entropy scanning across all code output blindly—otherwise you will redact every Git commit SHA, UUID, Webpack bundle hash, and `package-lock.json` integrity digest, ruining the agent's ability to debug! Instead, make entropy scanning **context-aware**: trigger it only when a high-entropy token (≥ 20 chars, entropy ≥ 4.5) appears right next to a sensitive assignment or header keyword (`password`, `secret`, `token`, `api_key`, `authorization`, `bearer`, `client_secret`) and does *not* match known non-secret formats (like pure 40-char hex git SHAs or UUIDs).
+**Crucial trick:** Never run raw entropy scanning across all code output blindly—otherwise you will redact every Git commit SHA, UUID, Webpack bundle hash, and `package-lock.json` integrity digest, ruining the agent's ability to debug! Instead, make entropy scanning **context-aware**: trigger it only when a high-entropy token (≥ 20 chars, entropy ≥ 4.2) appears right next to a sensitive assignment or header keyword (`password`, `secret`, `token`, `api_key`, `authorization`, `bearer`, `client_secret`) and does *not* match known non-secret formats (like pure 40-char hex git SHAs or UUIDs).
 
 #### Streaming Chunk-Boundary Protection
 When streaming command output in chunks (Chapters 02, 17), a 40-character API key can easily get sliced right down the middle across two consecutive chunks (`"Authorization: Bearer sk-ant-api03-abc"` followed by `"def123456..."`). If you scan each chunk independently, you miss the split secret!

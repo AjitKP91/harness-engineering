@@ -38,7 +38,7 @@ export function renderHomeView(root: HTMLElement, manifest: ManifestData): () =>
           </div>
           <div class="hero-actions">
             <a class="btn-primary" href="${primaryCtaHref}">${primaryCtaLabel}</a>
-            <a class="btn-secondary" href="#/labs">Try 6 Interactive Labs</a>
+            <a class="btn-secondary" href="#/labs">Try ${manifest.stats.totalLabs} Interactive Labs</a>
             <a class="btn-secondary" href="#/roadmap">View Roadmap</a>
           </div>
           <div class="hero-stats">
@@ -122,7 +122,7 @@ export function renderHomeView(root: HTMLElement, manifest: ManifestData): () =>
         <div class="section-header">
           <div>
             <h2 id="curriculum-heading" class="section-title">Full Curriculum Map</h2>
-            <p class="section-subtitle">8 modules · ${completed.size} of ${manifest.stats.totalChapters} chapters completed</p>
+            <p class="section-subtitle">${manifest.stats.totalModules} modules · ${completed.size} of ${manifest.stats.totalChapters} chapters completed</p>
           </div>
         </div>
         <div id="curriculum-modules">
@@ -168,6 +168,9 @@ export function renderHomeView(root: HTMLElement, manifest: ManifestData): () =>
             .join('')}
         </div>
       </section>
+      <p style="margin-top:24px;font-size:12.5px;color:var(--ink-muted);text-align:center;">
+        Vendor API endpoints, CLI flags, and protocol details verified against 2025–2026 specs as of November 2026.
+      </p>
     </main>
   `;
 

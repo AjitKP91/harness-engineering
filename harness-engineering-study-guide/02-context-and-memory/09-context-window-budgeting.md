@@ -52,12 +52,12 @@ Think of a **200,000-token** context window not as one flat bucket, but as a par
 | [System] | [Tools] | [Pinned] |       Conversation History       | Headroom |
 |   ~4k    |  ~12k   |   ~10k   |   (Grows across turns: 0..134k)  |  ~40k    |
 +-----------------------------------------------------------------------------+
-0          4k        16k        26k                        160k    160k    200k
-                                                             ^       ^
-                                                             |       |
-                                         Hard Compaction Trigger   Reserved for
-                                         (~80% of usable input)    Thinking + Output
-                                                                   (NEVER spend on input!)
+0          4k        16k        26k                  128k         160k       200k
+                                                      ^            ^
+                                                      |            |
+                                 Hard Compaction Trigger    Usable Input Cap
+                                 (80% of 160k usable)       (40k reserved for
+                                                            Thinking + Output!)
 ```
 
 Before every LLM call, your harness runs a **Pre-Turn Budget Gate** to decide whether to send as-is, warn, prune stale tool outputs, or trigger full compaction (Chapter 10):

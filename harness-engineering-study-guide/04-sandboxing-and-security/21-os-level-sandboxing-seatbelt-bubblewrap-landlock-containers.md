@@ -60,7 +60,7 @@ flowchart TD
     Policy --> Env["Layer 2: Secret Scrubbing & Path Guards (Ch. 22 & 25)"]
     Env --> Sandbox{"Layer 3: Isolation Boundary (This Chapter)"}
     Sandbox -->|"Fastest (~5-20ms)"| OSSandbox["OS Sandbox (macOS Seatbelt / Linux bwrap + Landlock + seccomp)"]
-    Sandbox -->|"Balanced (~100-500ms)"| Container["Container / Userspace Kernel (Docker / Podman / gVisor)"]
+    Sandbox -->|"Balanced (~150-800ms)"| Container["Container / Userspace Kernel (Docker / Podman / gVisor)"]
     Sandbox -->|"Strongest (~150-500ms)"| MicroVM["Hardware MicroVM (Firecracker / Kata / Apple Virtualization)"]
     OSSandbox --> Host["Host OS Kernel & Hardware"]
     Container --> Host
@@ -264,7 +264,7 @@ Let's compare the four heavyweight sandbox architectures used in 2025–2026:
 
 | Technology | How It Works | Startup Speed | Isolation Strength | Trade-offs & Sweet Spot |
 | :--- | :--- | :--- | :--- | :--- |
-| **Docker / Podman (Standard OCI Containers)** | Linux namespaces + cgroups + seccomp + AppArmor/SELinux on top of an OCI container image. | ~200–800 ms | Medium (shared Linux kernel) | Huge ecosystem, easy local setup (`docker run --rm --network=none`), familiar `Dockerfile`s. Weakest against Linux kernel zero-days unless paired with gVisor/Kata. |
+| **Docker / Podman (Standard OCI Containers)** | Linux namespaces + cgroups + seccomp + AppArmor/SELinux on top of an OCI container image. | ~150–800 ms (warm image) | Medium (shared Linux kernel) | Huge ecosystem, easy local setup (`docker run --rm --network=none`), familiar `Dockerfile`s. Weakest against Linux kernel zero-days unless paired with gVisor/Kata. |
 | **gVisor (`runsc`)** | Implements a clean-room Linux syscall interface in Go (the `sentry` user-space kernel). Container syscalls hit `sentry`, which issues only a tiny subset of syscalls to the real host kernel. | ~150–400 ms | High (drastically reduced host kernel exposure) | Drops right into Docker/Kubernetes (`--runtime=runsc`). Slightly slower on heavy filesystem I/O (like huge `npm install` trees), great for cloud code execution. |
 | **Firecracker / Kata Containers** | Boots a stripped-down Linux kernel inside a KVM hardware microVM. Each sandbox has its own kernel, memory space, and virtual block device. | ~125–300 ms (or ~20 ms via memory snapshots!) | **Very High** (hardware CPU virtualization boundary) | Industry gold standard for cloud coding-agent platforms (E2B, Modal, Fly.io Sprites). Requires KVM (bare-metal or nested virtualization on Linux). |
 | **Apple Containerization / Virtualization Framework** | On Apple Silicon Macs, spins up lightweight hardware-isolated Linux microVMs directly from standard OCI images via macOS's native Virtualization framework—no heavy monolithic Docker Desktop VM required. | ~300 ms–1 s | **Very High** (dedicated Linux guest kernel on Apple Silicon) | Game-changer for **local macOS coding agents**: run `npm install` and arbitrary Linux build scripts inside a disposable microVM while your host macOS files stay completely detached. |

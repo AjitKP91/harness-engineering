@@ -309,18 +309,19 @@ class SafeBrowserHarness:
         if parsed.scheme not in {"http", "https"}:
             return False
         origin = f"{parsed.scheme}://{parsed.netloc}"
-        if origin in self.allowed_origins:
-            return True
+        if origin not in self.allowed_origins:
+            return False  # Default-deny everything outside allowed_origins
 
-        # Extra SSRF defense: never allow unapproved private/link-local IPs
+        # Extra SSRF defense: block cloud metadata / unapproved link-local targets,
+        # while permitting explicit localhost dev origins listed in allowed_origins.
         host = parsed.hostname or ""
         try:
             ip = ipaddress.ip_address(socket.gethostbyname(host))
-            if ip.is_private or ip.is_loopback or ip.is_link_local:
+            if ip.is_link_local or (ip.is_private and host not in {"localhost", "127.0.0.1", "::1"}):
                 return False
         except OSError:
             return False
-        return False  # Default-deny everything outside allowed_origins
+        return True
 
     async def start(self) -> None:
         self._pw = await async_playwright().start()
@@ -399,6 +400,8 @@ class SafeBrowserHarness:
     async def observe(self) -> BrowserObservation:
         """Build a compact AXTree snapshot + drain recent console/network errors."""
         assert self._page
+        # Note: Newer Playwright releases deprecate page.accessibility.snapshot()
+        # in favor of locator.aria_snapshot() (YAML) or CDP Accessibility.getFullAXTree.
         raw_tree = await self._page.accessibility.snapshot(interesting_only=True)
         self._refs.clear()
         lines: list[str] = []

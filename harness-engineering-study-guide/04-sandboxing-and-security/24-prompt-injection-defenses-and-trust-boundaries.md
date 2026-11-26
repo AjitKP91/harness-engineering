@@ -255,7 +255,7 @@ Pure CaMeL works brilliantly for structured workflows (like email/calendar assis
 
 That is where **taint tracking** shines as a pragmatic middle ground for coding harnesses:
 
-- Every tool call declares a **trust level** for its output: `TRUSTED` (e.g., local git status of your own clean branch), `REPO_CONTENT` (workspace files), or `UNTRUSTED_EXTERNAL` (fetched web pages, public GitHub issues, external PRs, third-party MCP servers).
+- Every tool call declares a **trust level** for its output: `TRUSTED_USER` (direct authenticated user input or clean local metadata), `REPO_INTERNAL` (local workspace files), or `UNTRUSTED_EXTERNAL` (fetched web pages, public GitHub issues, external PRs, third-party MCP servers).
 - The harness maintains a deterministic **Taint State** for the current turn or session.
 - **Before** untrusted external content enters the context window, the session is `CLEAN`.
 - The moment any `UNTRUSTED_EXTERNAL` output enters the context, the harness flips the session state to `TAINTED` (recording *which* source tainted it).

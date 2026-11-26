@@ -118,7 +118,7 @@ Here is what that looks like in the two most common API shapes:
 }
 ```
 
-#### OpenAI Chat Completions / Responses API (`tool_calls` array)
+#### OpenAI Chat Completions API (`tool_calls` array)
 ```json
 {
   "role": "assistant",
@@ -142,6 +142,7 @@ Here is what that looks like in the two most common API shapes:
   ]
 }
 ```
+*(Note: OpenAI's newer **Responses API** represents parallel calls as separate top-level `function_call` output items matched by `call_id` rather than a nested `tool_calls` array—see [Chapter 01](./01-agent-tool-use-loop.md).)*
 
 > **Plain-English check — What is "fan-out" and "fan-in"?**
 > **Fan-out** means taking one turn and splitting it into multiple concurrent worker tasks (like spreading out a hand of cards). **Fan-in** means waiting for all of those workers to finish and collecting their outputs back into a single ordered list before the next LLM call.

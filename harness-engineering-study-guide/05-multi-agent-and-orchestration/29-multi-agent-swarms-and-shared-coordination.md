@@ -288,7 +288,7 @@ Later follow-ups from both camps converged on a nuanced, practical engineering r
 - **Parallel writers only win when the task is naturally shardable:** Independent microservices, separate frontend/backend behind a pre-agreed API contract, migrating 30 isolated test files, or building self-contained plugins.
 - **A single well-engineered agent wins when the task is tightly coupled:** Refactoring a core data model that touches 12 interconnected files, chasing down one subtle race condition across layers, or iterating quickly on a small feature.
 
-There is also **Amdahl's Law for Agents**: if 30% of your task is inherently sequential (planning, defining shared types, final integration, fixing cross-module test failures), then even with infinite parallel workers, your maximum possible speedup is less than 3.3×—while your token cost climbs linearly (or super-linearly) with every worker you add!
+There is also **Amdahl's Law for Agents**: if 30% of your task is inherently sequential (planning, defining shared types, final integration, fixing cross-module test failures), then even with infinite parallel workers, your maximum theoretical speedup is capped at $1 / 0.30 \approx 3.33\times$—while your token cost climbs linearly (or super-linearly) with every worker you add!
 
 #### Decision Matrix: Single Agent vs. Subagents vs. Full Swarm
 

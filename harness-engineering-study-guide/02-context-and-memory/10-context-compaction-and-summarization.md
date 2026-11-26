@@ -51,7 +51,7 @@ Well-engineered compaction impacts all four pillars of a production harness:
 2. **Reasoning Quality (Fighting Context Rot):** Stripping obsolete stack traces, failed dead-end experiments, and out-of-date copies of files you have already edited raises the **signal-to-noise ratio** of the working memory.
 3. **Cost & Prompt Cache Economics (The Hidden Trade-Off):** Recall from Chapter 08 that prompt caching gives you up to an 80–90% discount when the beginning (prefix) of your prompt stays byte-for-byte identical across turns.
    - If you compact **on every single turn**, you mutate the prefix every turn and **destroy your cache hit rate**—often making the agent *more* expensive!
-   - If you compact **infrequently at deliberate thresholds** (say, when context reaches 75–85% of budget, collapsing it back down to ~15–25%), you pay a single cache-write cost once, then enjoy 20–40 cheap cache-hit turns on a much smaller prompt.
+   - If you compact **infrequently at deliberate thresholds** (say, when context reaches 75–85% of budget, collapsing it back down to ~25–35%), you pay a single cache-write cost once, then enjoy 20–40 cheap cache-hit turns on a much smaller prompt.
 4. **Latency (Faster Time-To-First-Token):** Processing 180k input tokens takes noticeably longer than processing 25k tokens—even with warm KV caches. Compacting brings turn-by-turn snappiness back to life.
 
 ---

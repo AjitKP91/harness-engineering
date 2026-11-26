@@ -25,16 +25,16 @@ export function mountLab(container: HTMLElement, lab: LabDefinition): () => void
 function mountToolLoopLab(container: HTMLElement, lab: LabDefinition): () => void {
   const turns = [
     {
-      title: 'Turn 1: User sends bug report',
+      title: 'Turn 1: User sends bug report (Cold cache write)',
       stopReason: 'tool_use',
-      action: 'LLM asks to read tests/auth.test.ts',
+      action: 'LLM asks to read tests/test_auth.py',
       tokens: 1850,
-      cachedTokens: 1400,
+      cachedTokens: 0,
       messages: [
-        { role: 'user', content: 'Fix the failing login test in tests/auth.test.ts' },
+        { role: 'user', content: 'Fix the failing login test in tests/test_auth.py' },
         {
           role: 'assistant',
-          content: [{ type: 'tool_use', id: 'toolu_01', name: 'read_file', input: { path: 'tests/auth.test.ts' } }],
+          content: [{ type: 'tool_use', id: 'toolu_01', name: 'read_file', input: { path: 'tests/test_auth.py' } }],
         },
       ],
     },
@@ -43,9 +43,9 @@ function mountToolLoopLab(container: HTMLElement, lab: LabDefinition): () => voi
       stopReason: 'tool_use',
       action: 'LLM sees assertion & runs pytest to confirm failure',
       tokens: 3100,
-      cachedTokens: 1800,
+      cachedTokens: 1850,
       messages: [
-        { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_01', content: '12| expect(res.status).toBe(401)' }] },
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_01', content: '12| assert res.status_code == 401' }] },
         {
           role: 'assistant',
           content: [{ type: 'tool_use', id: 'toolu_02', name: 'run_shell', input: { command: 'pytest tests/test_auth.py' } }],

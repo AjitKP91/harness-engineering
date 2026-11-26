@@ -110,7 +110,7 @@ Not every subagent call needs full async choreography. Understanding both modes 
 
 ### 4.2 Message Envelopes, Mailboxes, Correlation IDs & Delivery Guarantees
 
-In the **Actor Model** (pioneered in Erlang/OTP, Akka, and Microsoft Orleans), every agent is an independent **actor** with:
+In the **Actor Model** (formalized by Carl Hewitt, Peter Bishop, and Richard Steiger in 1973, and popularized in production by Erlang/OTP, Akka, and Microsoft Orleans), every agent is an independent **actor** with:
 1. A globally unique **address** (`conversation_id` / `agent_id`).
 2. Strictly **private state** (its own conversation history and workspace).
 3. A **mailbox** (an ordered queue of incoming messages).

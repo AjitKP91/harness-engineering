@@ -1,6 +1,8 @@
 # The Complete Guide to AI Agent Harness Engineering
 
 > **A zero-to-mastery, human-friendly textbook on how modern AI coding agents actually work under the hood.**
+>
+> *Currency note (verified as of November 2026): Architectural principles in this guide are foundational and evergreen; vendor-specific API endpoints, CLI flags, environment variables, and protocol details reflect 2025–2026 releases and evolve rapidly—always check your provider's latest reference docs before shipping.*
 
 If you have ever wondered how tools like Claude Code, OpenAI's Codex CLI, Gemini CLI, OpenCode, or Aider actually turn a text-predicting language model into an agent that can read repositories, edit files safely, run tests, spawn helper agents, and work for hours without losing its mind—you are in the right place.
 

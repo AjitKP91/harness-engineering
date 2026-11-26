@@ -111,7 +111,7 @@ async function renderRoute(outlet: HTMLElement, withTransition: boolean): Promis
       activeCleanup = renderLabsView(outlet, manifest);
       document.title = 'Interactive Labs — Harness Engineering';
     } else if (path === '/glossary') {
-      activeCleanup = renderGlossaryView(outlet, glossaryData || [], params);
+      activeCleanup = renderGlossaryView(outlet, manifest, glossaryData || [], params);
       document.title = 'Plain-English Glossary — Harness Engineering';
     } else {
       activeCleanup = renderHomeView(outlet, manifest);

@@ -71,7 +71,7 @@ export function renderLabsView(root: HTMLElement, manifest: ManifestData): () =>
     <main class="container">
       <div class="section-header" style="margin-bottom:28px;">
         <div>
-          <span class="badge badge-teal">6 Interactive Simulators</span>
+          <span class="badge badge-teal">${manifest.stats.totalLabs} Interactive Simulators</span>
           <h1 id="page-heading" tabindex="-1" class="hero-title" style="margin-top:10px;font-size:clamp(2rem,3.5vw,2.8rem);">
             Interactive Harness Labs
           </h1>
@@ -112,6 +112,7 @@ export async function loadGlossaryData(): Promise<GlossaryEntry[]> {
 
 export function renderGlossaryView(
   root: HTMLElement,
+  manifest: ManifestData,
   entries: GlossaryEntry[],
   queryParams: URLSearchParams
 ): () => void {
@@ -130,7 +131,7 @@ export function renderGlossaryView(
             Plain-English Glossary
           </h1>
           <p class="hero-subtitle" style="margin-bottom:0;">
-            Every acronym and engineering term across all 41 chapters, explained simply with direct links back to the text.
+            Every acronym and engineering term across all ${manifest.stats.totalChapters} chapters, explained simply with direct links back to the text.
           </p>
         </div>
         <a class="btn-secondary" href="#/">← Back to Home</a>

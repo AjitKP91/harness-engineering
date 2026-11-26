@@ -96,13 +96,14 @@ When building an MCP client today, target the **2025-06-18 / 2025-11-25** specif
 
 ### 4.2 MCP Primitives: What Servers and Clients Can Do
 
-Many developers think MCP is *only* about tools. In reality, MCP defines **five core primitives** (plus the MCP Apps UI extension), split by **who initiates them**:
+Many developers think MCP is *only* about tools. In reality, MCP defines **six core primitives** (plus the MCP Apps UI extension), split by **who initiates them**:
 
 | Primitive | Direction | Who Controls It? | Key JSON-RPC Methods | Plain-English Purpose |
 | :--- | :--- | :--- | :--- | :--- |
 | **Tools** | Client → Server | **Model-controlled** (LLM decides when to invoke) | `tools/list`, `tools/call` | Executable actions and queries (e.g., `create_issue`, `run_sql`, `click_button`). |
 | **Resources** | Client → Server | **Application-controlled** (Host/user attaches context) | `resources/list`, `resources/read`, `resources/subscribe` | Read-only data identified by URIs (e.g., `postgres://db/schema`, `file:///logs/app.log`). |
 | **Prompts** | Client → Server | **User-controlled** (Triggered via slash commands / menus) | `prompts/list`, `prompts/get` | Reusable workflow templates provided by the server (e.g., `/sentry:triage-issue`). |
+| **Roots** | Server → Client | **Client-controlled** (Host declares allowed workspace URIs) | `roots/list`, `notifications/roots/list_changed` | Tells the server which workspace folders/URIs it is allowed to operate on. |
 | **Sampling** | Server → Client | **Server-requested** (Gated by Host & user) | `sampling/createMessage` | Lets a server ask the *Host's LLM* to summarize or reason over data without needing its own API key. |
 | **Elicitation** | Server → Client | **Server-requested** (Gated by Host & user) | `elicitation/create` | Lets a server pause mid-tool-call and ask the human directly for structured input or out-of-band sign-in. |
 
@@ -558,7 +559,7 @@ class MCPClientManager:
 ## 8. Key Takeaways & Quick Self-Check
 
 - **MCP turns $M \times N$ bespoke integrations into $M + N$:** Harnesses implement one MCP Client Manager; tool ecosystems implement one MCP Server per service.
-- **Know the five primitives:** **Tools** (model-controlled actions), **Resources** (app-controlled read-only URI data), **Prompts** (user-triggered templates), **Sampling** (server-requested LLM calls via the host), and **Elicitation** (human-in-the-loop forms and out-of-band URLs).
+- **Know the six primitives:** **Tools** (model-controlled actions), **Resources** (app-controlled read-only URI data), **Prompts** (user-triggered templates), **Roots** (client-controlled workspace boundaries), **Sampling** (server-requested LLM calls via the host), and **Elicitation** (human-in-the-loop forms and out-of-band URLs).
 - **Use modern transports:** `stdio` for local subprocesses (never write logs to `stdout`!), and **Streamable HTTP** (single endpoint + `Mcp-Session-Id` + optional SSE streaming + `Last-Event-ID` resumability) for remote servers.
 - **Never trust external MCP servers blindly:** Enforce OAuth 2.1 + PKCE + RFC 8707 Resource Indicators for remote auth, treat `readOnlyHint` annotations and tool descriptions as untrusted, and gate project `.mcp.json` configs behind explicit user trust.
 - **Defend your context window:** Sort namespaced tools deterministically for prompt caching, and switch to **deferred loading (`tool_search`)** before dozens of MCP schemas drown out the user's code.

@@ -107,7 +107,7 @@ In the early days of AI tooling, every framework invented its own attribute name
 | :--- | :--- | :--- |
 | **Agent Run** | `invoke_agent {gen_ai.agent.name}` | `gen_ai.operation.name = "invoke_agent"`, `gen_ai.agent.name`, `gen_ai.agent.id`, `gen_ai.conversation.id` |
 | **LLM Call** | `{gen_ai.operation.name} {gen_ai.request.model}` (e.g., `chat claude-sonnet-4-6`) | `gen_ai.operation.name = "chat"` (or `"generate_content"`), `gen_ai.provider.name` (`"anthropic"`, `"openai"`, `"gcp.vertex_ai"`), `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.response.finish_reasons` |
-| **Token Usage** *(on LLM Span)* | *(attributes on the LLM span)* | `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cache_creation.input_tokens`, `gen_ai.usage.reasoning.output_tokens` |
+| **Token Usage** *(on LLM Span)* | *(attributes on the LLM span)* | Core: `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` · Development/extended: `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cache_creation.input_tokens`, `gen_ai.usage.reasoning.output_tokens` |
 | **Tool Call** | `execute_tool {gen_ai.tool.name}` | `gen_ai.operation.name = "execute_tool"`, `gen_ai.tool.name`, `gen_ai.tool.call.id`, `gen_ai.tool.type` (`"function"` or `"extension"` / MCP) |
 
 #### Standard OTel GenAI Metrics
@@ -300,18 +300,21 @@ class NormalizedUsage:
 
 
 def normalize_anthropic_usage(raw: dict[str, Any]) -> NormalizedUsage:
-    """Anthropic `input_tokens` is EXCLUSIVE of cache read/creation tokens."""
+    """
+    Anthropic `input_tokens` is EXCLUSIVE of cache read/creation tokens.
+    Anthropic does not emit a separate `reasoning_tokens` usage field; extended-thinking
+    output tokens are already folded into `output_tokens` at the same output rate.
+    """
     uncached = int(raw.get("input_tokens", 0))
     cache_write = int(raw.get("cache_creation_input_tokens", 0))
     cache_read = int(raw.get("cache_read_input_tokens", 0))
     total_out = int(raw.get("output_tokens", 0))
-    reasoning = int(raw.get("reasoning_tokens", 0))
     return NormalizedUsage(
         uncached_input=uncached,
         cache_write_input=cache_write,
         cache_read_input=cache_read,
-        visible_output=max(0, total_out - reasoning),
-        reasoning_output=reasoning,
+        visible_output=total_out,
+        reasoning_output=0,
     )
 
 

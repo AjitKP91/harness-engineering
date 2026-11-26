@@ -278,7 +278,10 @@ def glob_files(
         for fname in files:
             full = Path(root) / fname
             rel = full.relative_to(workspace).as_posix()
-            # Match either full relative path or basename for ergonomics
+            # Match either full relative path or basename for ergonomics.
+            # Note: Python's stdlib fnmatch treats `*` as matching across `/`;
+            # production harnesses use gitignore-aware matchers (e.g., pathspec,
+            # Rust `globset`, or `rg --files -g`).
             if fnmatch.fnmatch(rel, pattern) or (
                 pattern.startswith("**/") and fnmatch.fnmatch(rel, pattern[3:])
             ):

@@ -357,8 +357,15 @@ class ShadowGitCheckpointer:
     def _init_shadow_repo(self) -> None:
         if not (self.shadow_git_dir / "HEAD").exists():
             self.shadow_git_dir.mkdir(parents=True, exist_ok=True)
-            # Initialize a bare repo so it has no working tree of its own
-            self._run_git("init", "--bare", str(self.shadow_git_dir))
+            # Initialize a bare repo with GIT_* stripped (`git init --bare` rejects GIT_WORK_TREE)
+            clean_env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+            subprocess.run(
+                ["git", "init", "--bare", str(self.shadow_git_dir)],
+                env=clean_env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
             # Disable hooks & ignore filemode noise across OSes
             self._run_git("config", "core.filemode", "false")
             self._run_git("config", "core.autocrlf", "false")
