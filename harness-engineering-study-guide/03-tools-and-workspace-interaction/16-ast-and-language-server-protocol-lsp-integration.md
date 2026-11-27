@@ -6,7 +6,7 @@
 
 In Chapters 14 and 15, we gave our agent sharp eyes (`read_file`, `glob`, `ripgrep`) and steady hands (`edit_file`). Yet right now, our agent still sees code the way Notepad sees a grocery list: **as flat lines of plain text**.
 
-Human engineers don't navigate code with `Ctrl+F` alone. When you click *"Go to Definition"* in VS Code, see a red squiggly line appear 150 milliseconds after mistyping a field name, or safely rename `User.save()` without touching `Invoice.save()`, you are relying on **structural code intelligence**—specifically **Abstract Syntax Trees (ASTs)** and the **Language Server Protocol (LSP)**. This chapter shows how harnesses unlock that exact same superpower for AI agents.
+Human engineers don't navigate code with `Ctrl+F` alone. When you click *"Go to Definition"* in VS Code, see a red squiggly line appear 150 milliseconds after mistyping a field name, or safely rename `User.save()` without touching `Invoice.save()`, you are relying on **structural code intelligence**: specifically **Abstract Syntax Trees (ASTs)** and the **Language Server Protocol (LSP)**. This chapter shows how harnesses unlock that exact same superpower for AI agents.
 
 ---
 
@@ -14,16 +14,16 @@ Human engineers don't navigate code with `Ctrl+F` alone. When you click *"Go to 
 
 Imagine editing a 500-page set of legal contracts spread across 30 binders:
 
-1. **Plain Text Search (`ripgrep`):** Like running `Ctrl+F` for the word `"Party"`. It finds every time the word appears—in definitions, in footnotes, in *"birthday party"*, and in completely unrelated contracts.
+1. **Plain Text Search (`ripgrep`):** Like running `Ctrl+F` for the word `"Party"`. It finds every time the word appears, in definitions, in footnotes, in *"birthday party"*, and in completely unrelated contracts.
 2. **An Abstract Syntax Tree (`AST` / Tree-sitter):** Like putting the contract through an **X-ray grammar scanner**. Instantly you see the exact hierarchy: *Section 4 → Clause 4.2 → Defined Term "Client"*. You can extract a clean Table of Contents of all 30 binders in milliseconds, or immediately notice that someone forgot to close a parenthesis on page 88.
 3. **A Language Server (`LSP`):** Like having a **senior lawyer who has already read all 30 binders sitting right beside you**. Point to *any* phrase on page 212 and ask:
    - *"Where is this exact term defined?"* (`goToDefinition`)
-   - *"Which clauses across all 30 binders legally depend on THIS specific definition—and NOT the identically named one in Binder 12?"* (`findReferences`)
-   - *"Wait—I just changed Clause 4.2. Did I accidentally contradict anything else?"* (`diagnostics`)
+   - *"Which clauses across all 30 binders legally depend on THIS specific definition, and NOT the identically named one in Binder 12?"* (`findReferences`)
+   - *"Wait: I just changed Clause 4.2. Did I accidentally contradict anything else?"* (`diagnostics`)
 
 **What breaks if you don't have AST or LSP support?**
 - Text search returns 400 false-positive hits for common method names like `render`, `init`, `save`, or `config`.
-- Agents only discover silly type errors, missing imports, or broken return types *after* waiting 20–60 seconds for a full shell build (`tsc`, `cargo check`, `mypy`)—if they remember to run it at all!
+- Agents only discover silly type errors, missing imports, or broken return types *after* waiting 20–60 seconds for a full shell build (`tsc`, `cargo check`, `mypy`), if they remember to run it at all!
 - Large files can't be summarized structurally; the agent has to read 800 lines just to discover what functions exist in a module.
 
 ---
@@ -32,9 +32,9 @@ Imagine editing a 500-page set of legal contracts spread across 30 binders:
 
 Adding AST and LSP capabilities transforms a coding agent's reliability in three measurable ways:
 
-1. **Sub-Second Compiler Feedback Loops:** A warm TypeScript, Go, Python, or Rust language server keeps the project's type graph **in memory**. When the agent edits a file, the LSP computes updated type errors in **100–500 milliseconds**—compared to 10–60 seconds for a cold CLI build. Catching a type error inside the `edit_file` response itself lets the agent self-correct immediately before moving on to the next file!
+1. **Sub-Second Compiler Feedback Loops:** A warm TypeScript, Go, Python, or Rust language server keeps the project's type graph **in memory**. When the agent edits a file, the LSP computes updated type errors in **100–500 milliseconds**: compared to 10–60 seconds for a cold CLI build. Catching a type error inside the `edit_file` response itself lets the agent self-correct immediately before moving on to the next file!
 2. **Surgical Symbol Navigation:** Instead of grepping `"process"` and wading through 300 lines of noise, `findReferences` returns *only* the 7 real call sites of `PaymentEngine.process()`, even across aliased imports (`import { process as runPayment }`).
-3. **High-Signal Code Compression:** Using Tree-sitter ASTs to show a file's **outline** (class signatures, function headers, and line ranges with bodies hidden) shrinks a 1,000-line file down to ~40 lines—giving the agent a map of the whole repository inside a tiny token budget.
+3. **High-Signal Code Compression:** Using Tree-sitter ASTs to show a file's **outline** (class signatures, function headers, and line ranges with bodies hidden) shrinks a 1,000-line file down to ~40 lines, giving the agent a map of the whole repository inside a tiny token budget.
 
 ---
 
@@ -100,25 +100,33 @@ dialog.close();            // <-- Unrelated ModalDialog.close
 ```
 
 Now ask: *"Rename `Connection.close` to `Connection.disconnect` and change `force` from `boolean` to an options object."*
-- **`ripgrep` for `close`** returns `ModalDialog.close`, `dialog.close()`, comments, string literals, and 90 other unrelated hits—while *still* failing to tell you whether `conn` in `src/app.ts` is a `Connection` or a `ModalDialog` without tracing the aliased import `Connection as DbConn` and type inference!
-- **LSP `findReferences`** uses the language's actual type checker and scope resolver. It returns **only** `src/db.ts:3` and `src/app.ts:14`—with 100% precision.
+- **`ripgrep` for `close`** returns `ModalDialog.close`, `dialog.close()`, comments, string literals, and 90 other unrelated hits, while *still* failing to tell you whether `conn` in `src/app.ts` is a `Connection` or a `ModalDialog` without tracing the aliased import `Connection as DbConn` and type inference!
+- **LSP `findReferences`** uses the language's actual type checker and scope resolver. It returns **only** `src/db.ts:3` and `src/app.ts:14`, with 100% precision.
 
 ---
 
 ### 4.2 Abstract Syntax Trees (ASTs) and Tree-sitter
 
-An **Abstract Syntax Tree (AST)** is the tree-shaped grammatical representation of source code. For example, `def add(a, b): return a + b` is not 28 characters to a parser—it is a structured tree:
+An **Abstract Syntax Tree (AST)** is the tree-shaped grammatical representation of source code. For example, `def add(a, b): return a + b` is not 28 characters to a parser: it is a structured tree:
 
-```text
-FunctionDef (name="add", lines 1-2)
-├── Parameters
-│   ├── Identifier ("a")
-│   └── Identifier ("b")
-└── Block
-    └── ReturnStatement
-        └── BinaryExpression (op="+")
-            ├── Identifier ("a")
-            └── Identifier ("b")
+```mermaid
+flowchart TD
+    Fn["FunctionDef (name='add', lines 1–2)"]
+    Params["Parameters"]
+    IdA1["Identifier ('a')"]
+    IdB1["Identifier ('b')"]
+    Blk["Block"]
+    Ret["ReturnStatement"]
+    Bin["BinaryExpression (op='+')"]
+    IdA2["Identifier ('a')"]
+    IdB2["Identifier ('b')"]
+
+    Fn --> Params
+    Params --> IdA1
+    Params --> IdB1
+    Fn --> Blk --> Ret --> Bin
+    Bin --> IdA2
+    Bin --> IdB2
 ```
 
 #### Why Tree-sitter Is the Standard in Agent Harnesses
@@ -130,13 +138,13 @@ Traditionally, getting an AST meant running each language's own compiler (Python
 #### Three Killer Uses of ASTs Inside a Harness
 1. **File Outlines & Repository Maps:** Parse a file and print only top-level declarations (classes, methods, function signatures, types, and line ranges) while hiding implementation bodies. **Aider's Repo Map** takes this even further: it extracts all symbol definitions and references across the repo using Tree-sitter, builds a directed dependency graph, runs **personalized PageRank** to find the most structurally central symbols for the current conversation, and packs the highest-ranked signatures into a compact token-budgeted overview!
 2. **Structural AST Code Chunking:** Instead of chopping files every 500 characters for semantic search ([Chapter 15](./15-codebase-search-ripgrep-glob-semantic-indexing.md)), walk the AST so every chunk is a complete function or class.
-3. **Instant Pre-Save Syntax Validation:** Before committing a patch (or right after applying it), parse the updated buffer with Tree-sitter. If the tree contains new `ERROR` or `MISSING` syntax nodes (like an unclosed bracket or indentation syntax error), report the exact line to the LLM immediately—even when no full LSP server is installed!
+3. **Instant Pre-Save Syntax Validation:** Before committing a patch (or right after applying it), parse the updated buffer with Tree-sitter. If the tree contains new `ERROR` or `MISSING` syntax nodes (like an unclosed bracket or indentation syntax error), report the exact line to the LLM immediately, even when no full LSP server is installed!
 
 ---
 
 ### 4.3 How LSP Works Under the Hood
 
-Before Microsoft introduced the **Language Server Protocol (LSP)** for VS Code in 2016, every editor ($M$ editors) had to re-implement code intelligence for every language ($N$ languages)—an $M \times N$ nightmare. LSP turns that into $M + N$: language teams write *one* language server (`pyright`, `typescript-language-server` / `vtsls`, `gopls`, `rust-analyzer`, `clangd`), and any editor—or **AI agent harness**—can act as an **LSP Client**.
+Before Microsoft introduced the **Language Server Protocol (LSP)** for VS Code in 2016, every editor ($M$ editors) had to re-implement code intelligence for every language ($N$ languages): an $M \times N$ nightmare. LSP turns that into $M + N$: language teams write *one* language server (`pyright`, `typescript-language-server` / `vtsls`, `gopls`, `rust-analyzer`, `clangd`), and any editor, or **AI agent harness**: can act as an **LSP Client**.
 
 #### Wire Framing: JSON-RPC 2.0 Over `stdio`
 Your harness spawns the language server as a child process (e.g., `pyright-langserver --stdio`) and exchanges **JSON-RPC 2.0** messages framed with an HTTP-like `Content-Length` header:
@@ -164,13 +172,13 @@ There are three message types:
 | **Real-Time Diagnostics** | `textDocument/publishDiagnostics` (push) or `textDocument/diagnostic` (pull, LSP 3.17) | Compiler/type-checker errors and warnings with exact line ranges and error codes (e.g., `TS2322`). |
 
 > **Crucial Indexing Gotcha (0-Based Lines + UTF-16 Columns!):**
-> Your `read_file` tool shows humans and LLMs **1-based** line numbers (line 1 is the first line). **LSP is 0-based** (`line: 0` is line 1), and its `character` offset counts **UTF-16 code units** (not UTF-8 bytes or Python characters—so an emoji like `🚀` has length 2 in UTF-16!). Always translate cleanly between 1-based tool arguments and 0-based UTF-16 LSP positions inside your harness so the LLM never has to do off-by-one arithmetic.
+> Your `read_file` tool shows humans and LLMs **1-based** line numbers (line 1 is the first line). **LSP is 0-based** (`line: 0` is line 1), and its `character` offset counts **UTF-16 code units** (not UTF-8 bytes or Python characters, so an emoji like `🚀` has length 2 in UTF-16!). Always translate cleanly between 1-based tool arguments and 0-based UTF-16 LSP positions inside your harness so the LLM never has to do off-by-one arithmetic.
 
 ---
 
 ### 4.4 Closing the Feedback Loop: Real-Time Post-Edit Diagnostics
 
-Exposing `goToDefinition` and `findReferences` as on-demand tools is useful—**but the single highest-leverage LSP feature in a coding harness is automatic post-edit diagnostics.**
+Exposing `goToDefinition` and `findReferences` as on-demand tools is useful, **but the single highest-leverage LSP feature in a coding harness is automatic post-edit diagnostics.**
 
 Here is why: models often forget to call a separate `get_diagnostics` tool after every small edit. Instead, your harness should wire LSP notifications directly into the end of `edit_file` / `write_file`:
 
@@ -178,7 +186,7 @@ Here is why: models often forget to call a separate `get_diagnostics` tool after
    - If the language server hasn't seen this file yet, send `textDocument/didOpen` with `version: 1` and the full file text.
    - If it *is* already open, increment the monotonic document `version` and send `textDocument/didChange` (plus `textDocument/didSave`, since some servers like `gopls` or `rust-analyzer` trigger full cross-file checks on save).
 2. **Wait Smartly (Debounce + Hard Timeout):**
-   Because `publishDiagnostics` arrives *asynchronously*, reading your diagnostic cache immediately after `didChange` is a race condition—you will read the *old* diagnostics!
+   Because `publishDiagnostics` arrives *asynchronously*, reading your diagnostic cache immediately after `didChange` is a race condition: you will read the *old* diagnostics!
    - Wait for a fresh `publishDiagnostics` notification for that URI (or issue a pull `textDocument/diagnostic` request if the server supports LSP 3.17).
    - Use a short **debounce** (e.g., **150ms** after a diagnostic packet arrives, because servers like TypeScript sometimes emit syntax diagnostics first and type diagnostics 80ms later!).
    - Enforce a strict **hard timeout** (e.g., **2.5–3.0 seconds**) so a slow or warming-up server never stalls the agent turn.
@@ -196,7 +204,7 @@ LSP Diagnostics (src/billing.ts — 1 error introduced):
   Line 48:12 [error TS2345] Argument of type 'string' is not assignable to parameter of type 'number'.
     48 |   const total = computeTax(subtotalStr, rate);
 ```
-The model sees the exact error code, line, column, and offending code in the very same turn—and immediately repairs it!
+The model sees the exact error code, line, column, and offending code in the very same turn, and immediately repairs it!
 
 ---
 
@@ -221,9 +229,9 @@ Running language servers inside a CLI or daemon harness introduces real systems-
 - **OpenCode (Built-In LSP Manager with Debounced Diagnostics):**
   OpenCode's LSP module (`touchFile` + `waitForDiagnostics`) automatically spawns configured language servers (such as `typescript-language-server`/`tsgo`, `pyright`, `gopls`, `rust-analyzer`) lazily when files are touched. After edits, it waits with a **150ms debounce and 3-second maximum timeout**, aggregates diagnostics per normalized path, and injects type errors directly into the tool result so the agent self-corrects immediately.
 - **Claude Code (Code Intelligence LSP Plugins):**
-  Claude Code connects to local language servers via official code-intelligence plugins (`typescript-lsp`, `pyright-lsp`, `gopls-lsp`, `rust-analyzer-lsp`). Once installed alongside the local server binary, Claude gains semantic navigation (`goToDefinition`, `findReferences`, `hover`) plus live type-error diagnostics after edits—while cleanly falling back to `ripgrep`/`glob` in cloud sandboxes where local LSP binaries aren't present.
+  Claude Code connects to local language servers via official code-intelligence plugins (`typescript-lsp`, `pyright-lsp`, `gopls-lsp`, `rust-analyzer-lsp`). Once installed alongside the local server binary, Claude gains semantic navigation (`goToDefinition`, `findReferences`, `hover`) plus live type-error diagnostics after edits, while cleanly falling back to `ripgrep`/`glob` in cloud sandboxes where local LSP binaries aren't present.
 - **IDE-Native Agents (Cursor, Windsurf, GitHub Copilot):**
-  Because they live *inside* VS Code / JetBrains, they don't spawn duplicate language servers—they query the editor's already-warm LSP host directly via IDE extension APIs (`vscode.languages.getDiagnostics`, `vscode.executeReferenceProvider`). This gives zero cold-start latency and shared RAM, though standalone terminal/CI agents must manage LSP lifecycles themselves.
+  Because they live *inside* VS Code / JetBrains, they don't spawn duplicate language servers: they query the editor's already-warm LSP host directly via IDE extension APIs (`vscode.languages.getDiagnostics`, `vscode.executeReferenceProvider`). This gives zero cold-start latency and shared RAM, though standalone terminal/CI agents must manage LSP lifecycles themselves.
 
 ---
 
@@ -235,7 +243,7 @@ Running language servers inside a CLI or daemon harness introduces real systems-
    - *Prevention:* Track indexing readiness via `$/progress` and explicitly warn the LLM when a server is still warming up.
 3. **Diagnostic Flood From Legacy Warnings:** Attaching 80 pre-existing lint warnings to every `edit_file` response wastes thousands of tokens and distracts the model into refactoring unrelated code.
    - *Prevention:* Filter to `Error` severity by default, compute the diff against pre-edit diagnostics when possible, and cap output cleanly.
-4. **Forgetting Document Version Synchronization:** Sending `didChange` with a stale or repeated `version` number—or forgetting to send `didOpen` before `didChange`—causes strict language servers to silently ignore your edits and keep reporting errors from the old file!
+4. **Forgetting Document Version Synchronization:** Sending `didChange` with a stale or repeated `version` number, or forgetting to send `didOpen` before `didChange`, causes strict language servers to silently ignore your edits and keep reporting errors from the old file!
    - *Prevention:* Maintain a strict per-URI document state machine (`closed` → `open(version=1)` → `open(version=N+1)`).
 5. **Wrong Python Virtualenv / Node Resolution:** Launching `pyright` outside the repo's `.venv` produces 50 fake `"Import 'fastapi' could not be resolved"` errors, tricking the agent into trying to reinstall packages or rewrite valid imports.
    - *Prevention:* Detect `.venv`/`node_modules` and pass the workspace interpreter path in LSP `initializationOptions` or `workspace/didChangeConfiguration`.
@@ -245,8 +253,8 @@ Running language servers inside a CLI or daemon harness introduces real systems-
 ## 7. Build It Yourself: Mini-Lab
 
 Below is a clean, zero-dependency, runnable Python mini-lab (`ast_and_lsp_lab.py`) demonstrating the two core harness mechanisms from this chapter:
-1. **AST Outline & Instant Syntax Validation** (using Python's built-in `ast` module—illustrating the exact same outline & syntax-guard pattern Tree-sitter generalizes across 100+ languages).
-2. **LSP JSON-RPC Wire Framing, UTF-16 Position Conversion, and Filtered Post-Edit Diagnostic Formatting**—including a runnable round-trip simulation!
+1. **AST Outline & Instant Syntax Validation** (using Python's built-in `ast` module: illustrating the exact same outline & syntax-guard pattern Tree-sitter generalizes across 100+ languages).
+2. **LSP JSON-RPC Wire Framing, UTF-16 Position Conversion, and Filtered Post-Edit Diagnostic Formatting**: including a runnable round-trip simulation!
 
 ```python
 """ast_and_lsp_lab.py — AST outline/validator + LSP JSON-RPC framing & diagnostics loop."""
@@ -435,8 +443,8 @@ Notice how `to_lsp_position` handles the rocket emoji `🚀`: Python counts it a
 ## 8. Key Takeaways & Quick Self-Check
 
 - **Text search cannot understand scope or types:** Method collisions, aliased imports, and type mismatches require AST and LSP intelligence.
-- **Tree-sitter gives fast, zero-setup structural power:** Use it in-process for compact file outlines, PageRank repo maps, AST-aligned code chunking, and instant syntax checks—even on half-written code.
-- **LSP connects your harness to real compilers:** Speak JSON-RPC 2.0 (`Content-Length` framing) over `stdio` for `goToDefinition`, `findReferences`, `hover`, and live `diagnostics`—translating carefully between 1-based human coordinates and 0-based UTF-16 LSP coordinates.
+- **Tree-sitter gives fast, zero-setup structural power:** Use it in-process for compact file outlines, PageRank repo maps, AST-aligned code chunking, and instant syntax checks, even on half-written code.
+- **LSP connects your harness to real compilers:** Speak JSON-RPC 2.0 (`Content-Length` framing) over `stdio` for `goToDefinition`, `findReferences`, `hover`, and live `diagnostics`; translating carefully between 1-based human coordinates and 0-based UTF-16 LSP coordinates.
 - **Close the edit-diagnostic loop automatically:** Push `didOpen`/`didChange` after every file edit, wait with a smart debounce + hard timeout (e.g., 150ms / 3s), filter to errors (especially newly introduced ones), and attach them right inside the `edit_file` response.
 - **Engineer for resource reality:** Spawn language servers lazily per `(language, project_root)`, surface warm-up progress honestly, evict idle servers to save RAM, and degrade gracefully when binaries are missing.
 
@@ -451,7 +459,7 @@ Notice how `to_lsp_position` handles the rocket emoji `🚀`: Python counts it a
 2. **Why does a harness like OpenCode use both a short debounce (e.g., 150ms) and a hard timeout (e.g., 3s) after sending `didChange` to a language server?**
    <details>
    <summary>Show Answer</summary>
-   Language servers compute diagnostics asynchronously—and often emit fast syntax checks first, followed ~50–150ms later by full type-checker diagnostics. Reading immediately causes a race condition (stale or empty diagnostics), while waiting without a timeout could hang the agent turn if the server is busy indexing a huge workspace. A debounce + hard cap balances accuracy with responsiveness.
+   Language servers compute diagnostics asynchronously, and often emit fast syntax checks first, followed ~50–150ms later by full type-checker diagnostics. Reading immediately causes a race condition (stale or empty diagnostics), while waiting without a timeout could hang the agent turn if the server is busy indexing a huge workspace. A debounce + hard cap balances accuracy with responsiveness.
    </details>
 
 3. **Why is it dangerous to return an empty `[]` from `findReferences` while a language server like `rust-analyzer` is still warming up?**

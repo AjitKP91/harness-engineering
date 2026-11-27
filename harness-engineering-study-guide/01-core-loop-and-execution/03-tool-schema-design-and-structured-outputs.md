@@ -6,18 +6,18 @@
 
 In Chapters 01 and 02, we built the loop and parsed live streams. Now we face the question that separates an agent that *barely works* from an agent that feels uncannily sharp: **how do you design the tools the model calls?**
 
-Most engineers treat tool definitions like boring boilerplate—auto-generating them straight from a database ORM or REST API and writing one-line descriptions like `"Reads a file"`. Then they wonder why the model passes relative paths instead of absolute ones, picks the wrong tool out of 40 lookalikes, or passes `"10"` (a string) when the function expects `10` (an integer).
+Most engineers treat tool definitions like boring boilerplate: auto-generating them straight from a database ORM or REST API and writing one-line descriptions like `"Reads a file"`. Then they wonder why the model passes relative paths instead of absolute ones, picks the wrong tool out of 40 lookalikes, or passes `"10"` (a string) when the function expects `10` (an integer).
 
-Here is the single most important mindset shift in this chapter: **a tool schema is a user interface—and your user is a language model.**
+Here is the single most important mindset shift in this chapter: **a tool schema is a user interface, and your user is a language model.**
 
 ---
 
 ## 1. The Simple Idea: Designing a Control Panel for a Brilliant Pilot Wearing Thick Gloves
 
-Imagine you are designing the cockpit controls for a world-class pilot who has never flown your specific airplane before—and who is wearing thick winter gloves.
+Imagine you are designing the cockpit controls for a world-class pilot who has never flown your specific airplane before, and who is wearing thick winter gloves.
 
 - If you give the pilot **85 tiny unlabeled toggle switches** (`fuel_valve_a`, `fuel_pump_v2`, `fuel_check_aux`, `fuel_check_main`), they will hesitate, flip the wrong switch, and waste precious seconds hunting for the right one.
-- If you give them **10 big, clearly labeled switches** with unmistakable engravings (*"LANDING GEAR — pull DOWN only below 200 knots; do NOT use for braking"*), physical detents so a switch can only click into valid positions (`UP` / `DOWN`), and a bright indicator that explains *why* an action didn't fire (*"Cannot lower gear above 200 knots — reduce airspeed first"*), the pilot flies effortlessly on their very first flight.
+- If you give them **10 big, clearly labeled switches** with unmistakable engravings (*"LANDING GEAR (pull DOWN only below 200 knots; do NOT use for braking"*), physical detents so a switch can only click into valid positions (`UP` / `DOWN`), and a bright indicator that explains *why* an action didn't fire (*"Cannot lower gear above 200 knots) reduce airspeed first"*), the pilot flies effortlessly on their very first flight.
 
 **What breaks if you design sloppy tool schemas?**
 1. **Format crashes:** Without strict schemas, models occasionally drop required fields, invent parameter names (`file_path` vs. `path`), or send wrong types.
@@ -29,7 +29,7 @@ Imagine you are designing the cockpit controls for a world-class pilot who has n
 
 ## 2. Why This Matters in a Real Agent Harness
 
-When Anthropic, OpenAI, and leading coding-agent teams evaluate what improves real benchmark scores the most, **tool design consistently rivals—and often beats—prompt tuning or model upgrades**:
+When Anthropic, OpenAI, and leading coding-agent teams evaluate what improves real benchmark scores the most, **tool design consistently rivals, and often beats, prompt tuning or model upgrades**:
 
 - **Accuracy:** A clear 4-sentence tool description with explicit "when to use / when NOT to use" guidance can slash wrong-tool selection errors in half without changing a single line of backend code.
 - **Zero-Retry Type Safety:** Enabling **constrained decoding (`strict: true`)** eliminates syntax errors and type mismatches at the token-generation level, cutting wasted retry turns to zero.
@@ -40,7 +40,7 @@ When Anthropic, OpenAI, and leading coding-agent teams evaluate what improves re
 
 ## 3. The Big Picture
 
-Here is what actually happens under the hood when you pass a `tools` array to an LLM API—both at the **prompt level** (how the model reads your descriptions) and at the **decoding level** (how `strict: true` constrains the output tokens):
+Here is what actually happens under the hood when you pass a `tools` array to an LLM API, both at the **prompt level** (how the model reads your descriptions) and at the **decoding level** (how `strict: true` constrains the output tokens):
 
 ```mermaid
 flowchart LR
@@ -66,7 +66,7 @@ You need **both**. Constrained decoding can guarantee that `path` is a `string`,
 
 ### 4.1 How LLMs "See" Tools (JSON Schema Serialized Into Context)
 
-It is easy to forget this, so let's make it crystal clear: **an LLM does not execute JSON Schema objects natively—it only reads tokens!**
+It is easy to forget this, so let's make it crystal clear: **an LLM does not execute JSON Schema objects natively; it only reads tokens!**
 
 When you pass a `tools` list to Anthropic, OpenAI, or Gemini, the provider's server serializes your tool names, descriptions, and **JSON Schema** (a standard JSON format for describing the shape, types, and rules of data objects) into a special block of text injected near the very top of the prompt, wrapped in provider-specific control tokens.
 
@@ -167,7 +167,7 @@ Look at all the unanswered questions the model has to guess: Does `search` match
 #### The 5-Point Tool Description Checklist
 1. **Unambiguous `verb_noun` name:** `grep_code` and `find_files` beat `search` and `lookup`.
 2. **State what it does *and* what it returns:** Mention limits (e.g., `"Returns at most 50 matches"`) so the model knows when to narrow its query.
-3. **Include explicit "When NOT to use" cross-pointers:** Pointing to the right sibling tool (*"Do NOT use for filenames—use `find_files` instead"*) is the fastest way to eliminate tool-selection confusion.
+3. **Include explicit "When NOT to use" cross-pointers:** Pointing to the right sibling tool (*"Do NOT use for filenames; use `find_files` instead"*) is the fastest way to eliminate tool-selection confusion.
 4. **Name parameters clearly & specify units/formats:** `timeout_seconds` beats `timeout`; `start_line` (1-based) beats `offset`; `iso_date` (`YYYY-MM-DD`) beats `date`.
 5. **Give one tiny concrete example** whenever syntax is tricky (globs, regex, date formats, patch headers).
 
@@ -199,7 +199,7 @@ Because the schema must compile cleanly into a deterministic grammar, strict mod
 | **First-request compilation latency** | Keep schemas stable! Providers cache compiled grammars for ~24 hours. | Dynamically mutating schema structure on every request triggers slow grammar recompilation. |
 
 > **What `strict: true` does NOT guarantee:**
-> 1. **Semantic correctness:** It guarantees `start_line` and `end_line` are integers—*not* that `start_line <= end_line` or that the file exists!
+> 1. **Semantic correctness:** It guarantees `start_line` and `end_line` are integers, *not* that `start_line <= end_line` or that the file exists!
 > 2. **Protection from `max_tokens` truncation:** If the response hits your output token limit halfway through generating the arguments, the JSON will still be cut off mid-string. Always check `stop_reason` (Chapters 01 & 02).
 
 ---
@@ -211,7 +211,7 @@ Good human APIs and good LLM tool APIs share some DNA, but they are **not identi
 #### 1. Atomic vs. Composite (Workflow-Aligned) Tools
 Suppose a user asks the agent to investigate a GitHub pull request.
 - **Too granular (raw REST mirroring):** `get_pr_metadata`, `list_pr_files`, `get_pr_diff`, `list_pr_comments`, `get_pr_ci_status`. That forces 5 separate LLM turns just to read one PR!
-- **Too bloated (mega-god tool):** One giant `github(action, repo, pr_num, issue_num, branch, body, labels, reviewers, ...)` with 35 optional parameters—confusing and error-prone.
+- **Too bloated (mega-god tool):** One giant `github(action, repo, pr_num, issue_num, branch, body, labels, reviewers, ...)` with 35 optional parameters; confusing and error-prone.
 - **Just right (workflow-aligned):** `get_pull_request_details(pr_number, include_diff, include_comments)` for reading, paired with focused write tools like `post_pr_comment` and `merge_pr`.
 
 | Granularity | Example | When It Shines | Watch Out For |
@@ -222,7 +222,7 @@ Suppose a user asks the agent to investigate a GitHub pull request.
 #### 2. Use Enums, Bounded Paginators, and Sensible Defaults
 - **Enums eliminate spelling guesses:** Instead of `"format": {"type": "string", "description": "output format"}`, use `"enum": ["summary", "detailed", "paths_only"]`. Combined with `strict: true`, the model can never pass `"concise"` or `"brief"`.
 - **Return token-efficient shapes:** Give read/search tools a `detail_level` or `limit` parameter so the model doesn't flood its context window with 5,000 lines of raw JSON when it only needed file paths.
-- **Handle paths forgivingly when safe:** If the model passes `"src/auth.py"` when your tool prefers `"/repo/src/auth.py"`, resolving workspace-relative paths deterministically (while rejecting `..` escapes outside the workspace—Ch. 22) prevents needless error turns.
+- **Handle paths forgivingly when safe:** If the model passes `"src/auth.py"` when your tool prefers `"/repo/src/auth.py"`, resolving workspace-relative paths deterministically (while rejecting `..` escapes outside the workspace; Ch. 22) prevents needless error turns.
 
 #### 3. Design Error Messages as Recovery Guidance
 In traditional backend software, an error message is written for a human reading a log file (`ERR_INVALID_RANGE`). In an agent harness, **every tool error is injected straight back into the LLM as its next prompt!**
@@ -264,10 +264,10 @@ Four proven techniques keep your tool surface sharp:
 
 ## 5. How Real Harnesses Do It
 
-- **Claude Code:** Deliberately keeps its built-in core toolset remarkably small and orthogonal—around a dozen sharply distinct primitives (`Read`, `Edit`, `Write`, `Glob`, `Grep`, `Bash`, `WebFetch`, `Task`/subagent, `TodoWrite`). Every built-in tool description is a richly detailed micro-prompt explaining exact constraints, edge cases, and explicit pointers to sibling tools (for instance, telling the model to prefer `Glob`/`Grep`/`Read` over raw `Bash` `find`/`cat` commands). When large MCP tool suites are connected, Claude Code supports deferred tool loading / tool search so dozens of external schemas don't bloat every turn.
-- **OpenAI Codex CLI:** Uses a deliberately compact, high-leverage tool surface centered on `shell` (sandboxed command execution) and `apply_patch` (a dedicated structured diff tool built directly into OpenAI's Responses API). Rather than giving the model 15 separate file-manipulation endpoints, `apply_patch` handles file creation, surgical multi-hunk updates, and deletions in one crisp protocol—and returns structured mismatch diagnostics (`apply_patch_call_output`) so the model self-corrects immediately when context lines drift.
+- **Claude Code:** Deliberately keeps its built-in core toolset remarkably small and orthogonal; around a dozen sharply distinct primitives (`Read`, `Edit`, `Write`, `Glob`, `Grep`, `Bash`, `WebFetch`, `Task`/subagent, `TodoWrite`). Every built-in tool description is a richly detailed micro-prompt explaining exact constraints, edge cases, and explicit pointers to sibling tools (for instance, telling the model to prefer `Glob`/`Grep`/`Read` over raw `Bash` `find`/`cat` commands). When large MCP tool suites are connected, Claude Code supports deferred tool loading / tool search so dozens of external schemas don't bloat every turn.
+- **OpenAI Codex CLI:** Uses a deliberately compact, high-leverage tool surface centered on `shell` (sandboxed command execution) and `apply_patch` (a dedicated structured diff tool built directly into OpenAI's Responses API). Rather than giving the model 15 separate file-manipulation endpoints, `apply_patch` handles file creation, surgical multi-hunk updates, and deletions in one crisp protocol, and returns structured mismatch diagnostics (`apply_patch_call_output`) so the model self-corrects immediately when context lines drift.
 - **Gemini CLI:** Organizes built-in tools (`read_file`, `replace`, `write_file`, `glob`, `grep_search`, `run_shell_command`, `web_fetch`) with explicit JSON Schema typing, validation hooks (`BeforeTool`), and strongly typed error payloads. When MCP servers register additional tools, Gemini CLI namespaces them and lets users filter allowed tools per project to prevent tool bloat.
-- **Aider:** Showed early on that matching the edit tool's format to how models naturally write code (e.g., Search/Replace blocks vs. unified diffs depending on the model family) dramatically improves edit success rates—proving that tool ergonomics matter as much as model intelligence.
+- **Aider:** Showed early on that matching the edit tool's format to how models naturally write code (e.g., Search/Replace blocks vs. unified diffs depending on the model family) dramatically improves edit success rates: proving that tool ergonomics matter as much as model intelligence.
 - **OpenCode:** Defines every tool with a typed Zod schema (automatically compiled to JSON Schema for the provider), crisp per-parameter descriptions, and structured metadata (like permission categories), ensuring validation errors are converted into helpful LLM-readable feedback strings rather than unhandled exceptions.
 
 ---
@@ -465,7 +465,7 @@ SEARCH_CODE_TOOL = build_strict_tool_definition(
 )
 ```
 
-Look closely at what happens when the model makes a mistake—say, passing `directory="backend"` in a repo whose folder is actually named `server`:
+Look closely at what happens when the model makes a mistake: say, passing `directory="backend"` in a repo whose folder is actually named `server`:
 - Instead of returning `FileNotFoundError`, the tool tells the model **the exact available top-level directories**. On the very next turn, the model immediately calls `search_code(directory="server", ...)` and succeeds!
 
 ---
@@ -474,7 +474,7 @@ Look closely at what happens when the model makes a mistake—say, passing `dire
 
 - **Tool schemas are prompts.** LLMs read serialized JSON Schema text and pay real input tokens for every tool on every turn.
 - **Write micro-prompt descriptions.** Explain *what* the tool does, *when to use it*, *when NOT to use it* (pointing to sibling tools), exact parameter formats, and output limits.
-- **Use `strict: true` for syntax and types—never as your only validator.** Constrained decoding masks invalid tokens at generation time so JSON always matches your schema, but your harness must still validate semantics, ranges, and security boundaries.
+- **Use `strict: true` for syntax and types, never as your only validator.** Constrained decoding masks invalid tokens at generation time so JSON always matches your schema, but your harness must still validate semantics, ranges, and security boundaries.
 - **Design for workflows, not raw database tables.** Prefer 5–15 cohesive, well-namespaced tools with enums and bounded outputs over 60 overlapping CRUD endpoints.
 - **Turn errors into recovery instructions.** Every tool failure message should tell the model what went wrong and what concrete adjustment to make next.
 
@@ -490,7 +490,7 @@ Look closely at what happens when the model makes a mistake—say, passing `dire
 <code>strict: true</code> prevents <strong>A</strong> (wrong type) and <strong>D</strong> (missing required field) at the token-decoding layer. Your deterministic harness code must still catch <strong>B</strong> (semantic range violation) and <strong>C</strong> (path traversal outside workspace security boundary).
 </details>
 
-**2. Why does adding explicit *"Do NOT use this tool for X — use tool Y instead"* lines to tool descriptions improve agent accuracy so noticeably?**
+**2. Why does adding explicit *"Do NOT use this tool for X: use tool Y instead"* lines to tool descriptions improve agent accuracy so noticeably?**
 <details>
 <summary>Show Answer</summary>
 Models often see multiple plausible tools for a task (e.g., <code>grep_code</code>, <code>find_files</code>, and <code>run_shell</code>). Negative guidance creates crisp decision boundaries right where the model weighs tool selection, preventing trial-and-error calls and routing the model straight to the optimal tool on the first try.
@@ -499,7 +499,7 @@ Models often see multiple plausible tools for a task (e.g., <code>grep_code</cod
 **3. What happens to prompt caching and token costs if you attach 80 uncurated MCP tools to every turn of a 25-turn coding session?**
 <details>
 <summary>Show Answer</summary>
-Even with prompt caching, 80 schemas can occupy 15,000–30,000 tokens of context window space—reducing attention quality (increasing wrong-tool selection), accelerating context-window limits, and multiplying input costs whenever cache misses or TTL expirations occur. Consolidating tools, scoping them per subagent/mode, or using progressive disclosure (Chapter 12) keeps the active tool surface lean.
+Even with prompt caching, 80 schemas can occupy 15,000–30,000 tokens of context window space: reducing attention quality (increasing wrong-tool selection), accelerating context-window limits, and multiplying input costs whenever cache misses or TTL expirations occur. Consolidating tools, scoping them per subagent/mode, or using progressive disclosure (Chapter 12) keeps the active tool surface lean.
 </details>
 
 **4. Why is `"Error: directory 'app' does not exist. Available top-level directories: src, tests, scripts."` vastly better than `"Error: ENOENT"` for an agent tool?**

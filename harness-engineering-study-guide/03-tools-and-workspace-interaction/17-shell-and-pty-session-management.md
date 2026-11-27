@@ -4,7 +4,7 @@
 
 # 17. Shell & PTY Session Management
 
-Reading files and editing code only get an agent halfway to solving real software problems. To actually *know* whether a fix works, an agent needs to run compilers, execute test suites, inspect `git status`, install packages, and start local servers. That means giving the agent a **shell tool**—and suddenly, your neat, clean JSON-in/JSON-out harness is face-to-face with fifty years of quirky Unix and Windows terminal behavior.
+Reading files and editing code only get an agent halfway to solving real software problems. To actually *know* whether a fix works, an agent needs to run compilers, execute test suites, inspect `git status`, install packages, and start local servers. That means giving the agent a **shell tool**: and suddenly, your neat, clean JSON-in/JSON-out harness is face-to-face with fifty years of quirky Unix and Windows terminal behavior.
 
 Running a shell command looks deceptively simple: one call to `subprocess.run()` or `child_process.exec()`, right? In practice, naive shell execution is one of the fastest ways to freeze an agent, burn thousands of tokens on unreadable escape characters, or leave invisible orphan processes eating your laptop's RAM and ports long after the agent finishes.
 
@@ -14,14 +14,14 @@ Running a shell command looks deceptively simple: one call to `subprocess.run()`
 
 Imagine two ways to ask a mechanic in a garage to inspect your car:
 
-1. **Passing notes through a mail slot (Stateless `exec`):** Every time you slide a note under the door—*"Walk into the garage and open the hood"*—a brand-new mechanic spawns inside the garage, opens the hood, writes down what they saw, and vanishes. When you slide your next note—*"Now check the oil dipstick"*—another brand-new mechanic appears back at the front door with no memory of where the first mechanic was standing or which toolbox they opened.
-2. **A live two-way intercom to one mechanic at the workbench (Persistent PTY):** You open a single live voice line. You say *"Step over to the `backend/` bay and activate the Python toolkit."* The mechanic stays right there, holding those tools, ready for your next instruction. They can even answer interactive questions—like *"Are you sure you want to overwrite this config? (y/n)"*—because the line stays open both ways.
+1. **Passing notes through a mail slot (Stateless `exec`):** Every time you slide a note under the door, *"Walk into the garage and open the hood"*, a brand-new mechanic spawns inside the garage, opens the hood, writes down what they saw, and vanishes. When you slide your next note, *"Now check the oil dipstick"*, another brand-new mechanic appears back at the front door with no memory of where the first mechanic was standing or which toolbox they opened.
+2. **A live two-way intercom to one mechanic at the workbench (Persistent PTY):** You open a single live voice line. You say *"Step over to the `backend/` bay and activate the Python toolkit."* The mechanic stays right there, holding those tools, ready for your next instruction. They can even answer interactive questions, like *"Are you sure you want to overwrite this config? (y/n)"*: because the line stays open both ways.
 
 Both models are useful, and both have sharp edges!
 
 **What breaks if you don't engineer shell and terminal sessions carefully?**
 - **Silent amnesia:** The agent runs `cd services/api`, then runs `pytest`, and wonders why `pytest` ran in the repo root and found zero tests.
-- **Forever hangs:** The agent runs `git log` or `git fetch`. Behind the scenes, `git` opens `less` (waiting for you to press `q`) or asks for your GitHub password. There is no human at the keyboard—so the tool sits frozen until the timeout fires two minutes later.
+- **Forever hangs:** The agent runs `git log` or `git fetch`. Behind the scenes, `git` opens `less` (waiting for you to press `q`) or asks for your GitHub password. There is no human at the keyboard, so the tool sits frozen until the timeout fires two minutes later.
 - **Garbled context windows:** A colorful test runner outputs thousands of invisible ANSI color codes and `\r` progress-bar redraws, drowning out the actual error message and wasting tokens.
 - **Zombie and orphan leaks:** A test runner times out. Your harness kills the outer `bash` process, but the `node` or `python` worker processes it spawned keep running in the background forever, locking port `3000` so the next test run fails with `EADDRINUSE`.
 
@@ -78,11 +78,11 @@ When your harness runs a command like `pytest tests/test_auth.py`, it must choos
 
 | Dimension | Stateless Subprocess (`exec`) | Persistent Interactive PTY |
 | :--- | :--- | :--- |
-| **State persistence (`cd`, `export`, `venv`)** | None by default (must pass `cwd` / `env` explicitly or chain with `&&`). | Built-in—feels just like a human's terminal tab. |
+| **State persistence (`cd`, `export`, `venv`)** | None by default (must pass `cwd` / `env` explicitly or chain with `&&`). | Built-in: feels just like a human's terminal tab. |
 | **Parallel tool calls (Ch. 04)** | **Safe & natural:** two calls run in two independent processes simultaneously. | **Serialized / tricky:** two commands writing into one shared PTY scramble each other's output. |
 | **Command boundary & exit code detection** | **Exact:** the OS kernel tells you the exact moment the process exits and gives you its integer exit code. | **Heuristic/Sentinel-based:** the shell never exits, so you must inject a unique sentinel string (e.g., `echo "__DONE_<uuid>__:$?"`) and parse the stream. |
-| **Interactive programs (`ssh`, REPLs, TUIs)** | Usually fail or refuse to run because `isatty()` is `false`. | Supported—programs see a real terminal and can receive follow-up keystrokes. |
-| **Output buffering** | Many runtimes (Python, C `stdio`) switch to 4–8 KB block buffering over pipes, delaying live output. | Line-buffered by default—output flushes immediately line by line. |
+| **Interactive programs (`ssh`, REPLs, TUIs)** | Usually fail or refuse to run because `isatty()` is `false`. | Supported: programs see a real terminal and can receive follow-up keystrokes. |
+| **Output buffering** | Many runtimes (Python, C `stdio`) switch to 4–8 KB block buffering over pipes, delaying live output. | Line-buffered by default: output flushes immediately line by line. |
 | **Failure blast radius** | Self-contained: a wedged command only kills that one subprocess. | Shared: a syntax error (like an unclosed quote `echo "oops`) or hung foreground job can wedge the entire shell session until reset. |
 
 **How do real harnesses choose?**
@@ -98,16 +98,22 @@ Many modern harnesses use a **hybrid strategy**:
 
 You will hear systems engineers throw around acronyms like **TTY**, **PTY**, **ANSI**, and **`isatty()`**. They sound intimidating, but the concept is delightfully simple.
 
-Back in the 1960s, a **TTY** (**Teletypewriter**) was a physical keyboard-and-printer machine wired to a mainframe computer. Today, there is no physical teletype—just a terminal app (like iTerm2, Ghostty, VS Code's terminal, or your agent harness). To keep fifty years of Unix programs happy, the operating system provides a **PTY** (**Pseudo-Terminal**): a fake, software-only terminal made of two connected halves inside the kernel.
+Back in the 1960s, a **TTY** (**Teletypewriter**) was a physical keyboard-and-printer machine wired to a mainframe computer. Today, there is no physical teletype: just a terminal app (like iTerm2, Ghostty, VS Code's terminal, or your agent harness). To keep fifty years of Unix programs happy, the operating system provides a **PTY** (**Pseudo-Terminal**): a fake, software-only terminal made of two connected halves inside the kernel.
 
-```text
-+----------------------+          OS Kernel           +---------------------------+
-|   Your Agent Harness |                              |  Shell / Child Command    |
-|                      |   write() ->  +-----------+  |                           |
-|   PTY Controller     |==============>|   Line    |==|  PTY Worker (slave)       |
-|   (formerly "master")|<==============| Discipline|<=|  (/dev/pts/4 or /dev/ttys)|
-|                      |   <- read()   +-----------+  |  stdin(0) stdout(1) err(2)|
-+----------------------+                              +---------------------------+
+```mermaid
+flowchart LR
+    subgraph Host["Your Agent Harness"]
+        Ctrl["PTY Controller\n(formerly 'master')"]
+    end
+    subgraph Kernel["OS Kernel"]
+        LD["Line Discipline"]
+    end
+    subgraph Child["Shell / Child Command"]
+        Worker["PTY Worker (slave)\n/dev/pts/4 or /dev/ttys\nstdin(0) · stdout(1) · stderr(2)"]
+    end
+
+    Ctrl -->|"write()"| LD --> Worker
+    Worker --> LD -->|"read()"| Ctrl
 ```
 
 Here are the four pieces every harness engineer should understand:
@@ -116,7 +122,7 @@ Here are the four pieces every harness engineer should understand:
    - **File Descriptor `0` (`stdin`):** Input fed *into* the program (keyboard typing or piped text).
    - **File Descriptor `1` (`stdout`):** Normal output printed by the program.
    - **File Descriptor `2` (`stderr`):** Error messages, warnings, and progress logs.
-   - *Subtle PTY detail:* With plain pipes, `stdout` and `stderr` are completely separate streams. With a single PTY, both `stdout` and `stderr` are usually wired to the same PTY worker device, meaning they arrive **merged in chronological order**—just like on your screen—at the cost of losing strict `stdout`-vs.-`stderr` separation.
+   - *Subtle PTY detail:* With plain pipes, `stdout` and `stderr` are completely separate streams. With a single PTY, both `stdout` and `stderr` are usually wired to the same PTY worker device, meaning they arrive **merged in chronological order**, just like on your screen, at the cost of losing strict `stdout`-vs.-`stderr` separation.
 
 2. **`isatty()` and Output Buffering:**
    Programs frequently ask the OS: *"Am I talking to a real terminal (`isatty(1) == true`) or a plain pipe (`isatty(1) == false`)?"*
@@ -124,7 +130,7 @@ Here are the four pieces every harness engineer should understand:
    - Over a **pipe** (`isatty == false`), C's `stdio` and Python switch to **full block buffering** (holding back output in 4 KB–8 KB chunks until the buffer fills or the program exits). That is why a long Python script running over a pipe can appear totally silent for 30 seconds unless you pass `PYTHONUNBUFFERED=1` or use a PTY!
 
 3. **TTY Modes and Window Size:**
-   Inside the kernel sits the **line discipline**, which translates keystrokes (`Ctrl+C` becomes `SIGINT`; `Backspace` erases characters; `\n` turns into `\r\n`). In **canonical (cooked) mode**, it waits for Enter before handing a line to the program. In **raw mode** (used by `vim`, `fzf`, or interactive menus), every single keypress is delivered immediately. A PTY also has a virtual screen width and height (rows × columns, e.g., `24×120` set via `TIOCSWINSZ`). If you leave the width at `80` columns—or worse, `0`—tools like `pytest` and `rich` wrap tables awkwardly or crash.
+   Inside the kernel sits the **line discipline**, which translates keystrokes (`Ctrl+C` becomes `SIGINT`; `Backspace` erases characters; `\n` turns into `\r\n`). In **canonical (cooked) mode**, it waits for Enter before handing a line to the program. In **raw mode** (used by `vim`, `fzf`, or interactive menus), every single keypress is delivered immediately. A PTY also has a virtual screen width and height (rows × columns, e.g., `24×120` set via `TIOCSWINSZ`). If you leave the width at `80` columns (or worse, `0`) tools like `pytest` and `rich` wrap tables awkwardly or crash.
 
 4. **ANSI Escape Codes and Carriage Returns (`\r`):**
    Terminals render colors, bold text, and animated spinners using invisible control sequences starting with the Escape byte (`\x1b`, often printed as `^[[`).
@@ -158,7 +164,7 @@ When your harness naively runs `subprocess.run(["/bin/sh", "-c", "node -v"])`:
 - Its `$PATH` is often just `/usr/bin:/bin`, so `node`, `pytest`, `cargo`, `go`, and `rg` all fail with exit code `127` (`command not found`).
 
 **How production harnesses fix this cleanly:**
-1. **Inherit the parent CLI's environment** when launched from the user's terminal—it already has their initialized `$PATH` and active virtual environment.
+1. **Inherit the parent CLI's environment** when launched from the user's terminal: it already has their initialized `$PATH` and active virtual environment.
 2. **One-time login shell snapshot** (for desktop apps, IDEs, or daemons launched outside a terminal): at session startup, run the user's login shell *once* (`zsh -l -i -c 'env -0'`), parse the null-delimited environment variables, filter out unsafe or noisy entries, and cache that snapshot for the rest of the session. Running `-l -i` on *every* tool call is painfully slow (often 300–800ms per command if the user has Oh My Zsh or `conda init`!), whereas snapshotting once amortizes that cost to zero.
 
 #### Working Directory (`cwd`) Tracking & Workspace Guardrails
@@ -172,7 +178,7 @@ Every Unix command ends with an integer **exit code** from `0` to `255`:
 - **`1`–`125`**: Command-specific failure (failing test, compiler error, missing file).
 - **`126`**: Command found, but not executable (permission denied).
 - **`127`**: Command not found (usually a `$PATH` issue or missing binary).
-- **`128 + N`**: Terminated by signal `N`—for example, `130` (`128 + 2`, `SIGINT` / Ctrl+C), `137` (`128 + 9`, `SIGKILL` / out-of-memory killer or hard timeout), `143` (`128 + 15`, `SIGTERM`).
+- **`128 + N`**: Terminated by signal `N`, for example, `130` (`128 + 2`, `SIGINT` / Ctrl+C), `137` (`128 + 9`, `SIGKILL` / out-of-memory killer or hard timeout), `143` (`128 + 15`, `SIGTERM`).
 
 Always return the **exact exit code** explicitly in your tool result (even when output is empty!). Consider `grep "DEPRECATED" src/`: when it finds zero matches, it prints nothing and returns exit code `1`. Without the exit code, the agent cannot tell the difference between "zero matches" and "silent crash."
 
@@ -191,7 +197,7 @@ When the harness reads `__HARNESS_END_9f3c2a1b__:0:/workspace/app__` from the PT
 2. It extracts exit code `0` and updated working directory `/workspace/app`.
 3. It strips the sentinel line before handing the captured output to the LLM.
 
-Using a fresh random UUID/hex suffix per command guarantees that normal command output—or even a malicious file containing a hardcoded sentinel string—cannot spoof early command completion!
+Using a fresh random UUID/hex suffix per command guarantees that normal command output, or even a malicious file containing a hardcoded sentinel string, cannot spoof early command completion!
 
 ---
 
@@ -199,7 +205,7 @@ Using a fresh random UUID/hex suffix per command guarantees that normal command 
 
 The single most common failure in homegrown coding agents is the **interactive hang**: the agent runs a completely normal developer command, and the command silently pauses waiting for a human to press a key.
 
-Here are the classic hang traps and the exact environment variables and flags—your **Non-Interactive Armor Kit**—that neutralize them:
+Here are the classic hang traps and the exact environment variables and flags, your **Non-Interactive Armor Kit**, that neutralize them:
 
 | Hang Trap | Why It Freezes | Harness Defense (Env Var / Config) |
 | :--- | :--- | :--- |
@@ -215,7 +221,7 @@ Here are the classic hang traps and the exact environment variables and flags—
 For non-interactive subprocess runs, always connect `stdin` to `/dev/null` (`subprocess.DEVNULL` in Python, `stdio: ['ignore', 'pipe', 'pipe']` in Node.js). When a CLI tries to read a `y/n` confirmation from `stdin`, it immediately receives `EOF` (End-of-File) instead of blocking until the timeout expires!
 
 #### What About `CI=true` Side Effects?
-Setting `CI=true` is magic for disabling watch modes (e.g., `vitest` and `react-scripts test` run once and exit instead of watching forever) and suppressing interactive prompts. Just be aware of one quirk: a few build tools (like Create React App or Next.js linters) treat ESLint warnings as fatal errors when `CI=true`. Documenting that behavior—or letting users override env vars per project—avoids head-scratching surprises.
+Setting `CI=true` is magic for disabling watch modes (e.g., `vitest` and `react-scripts test` run once and exit instead of watching forever) and suppressing interactive prompts. Just be aware of one quirk: a few build tools (like Create React App or Next.js linters) treat ESLint warnings as fatal errors when `CI=true`. Documenting that behavior, or letting users override env vars per project, avoids head-scratching surprises.
 
 ---
 
@@ -225,15 +231,18 @@ Suppose the agent runs `npm test`, which starts an infinite loop inside a test w
 
 **Wrong.** Look at the actual process tree that `sh -c "npm test"` created:
 
-```text
-Agent Harness (PID 500, PGID 500)
-  └── /bin/bash -c "npm test" (PID 1000, PGID 1000)   <-- proc.kill() ONLY kills this!
-        └── npm test          (PID 1001, PGID 1000)   <-- STILL ALIVE (orphaned -> PID 1)
-              └── node vitest (PID 1002, PGID 1000)   <-- STILL ALIVE (holding port 5173!)
-                    └── worker(PID 1003, PGID 1000)   <-- STILL ALIVE (burning 100% CPU!)
+```mermaid
+flowchart TD
+    H["Agent Harness (PID 500, PGID 500)"]
+    Sh["/bin/bash -c 'npm test' (PID 1000, PGID 1000)\nproc.kill() ONLY kills this!"]
+    Npm["npm test (PID 1001, PGID 1000)\nSTILL ALIVE (orphaned -> PID 1)"]
+    Vitest["node vitest (PID 1002, PGID 1000)\nSTILL ALIVE (holding port 5173!)"]
+    Worker["worker (PID 1003, PGID 1000)\nSTILL ALIVE (burning 100% CPU!)"]
+
+    H --> Sh --> Npm --> Vitest --> Worker
 ```
 
-When you kill only PID `1000`, the operating system **reparents** PIDs `1001`, `1002`, and `1003` to PID `1` (`init`/`launchd`). They become **orphan processes**—invisible to your harness, still consuming CPU, still holding open file handles (which can even keep your `stdout` pipe open so your harness *still* hangs waiting for EOF!), and still binding localhost ports.
+When you kill only PID `1000`, the operating system **reparents** PIDs `1001`, `1002`, and `1003` to PID `1` (`init`/`launchd`). They become **orphan processes**: invisible to your harness, still consuming CPU, still holding open file handles (which can even keep your `stdout` pipe open so your harness *still* hangs waiting for EOF!), and still binding localhost ports.
 
 #### The Solution: Sessions (`setsid`) and Process Groups (`PGID`)
 In Unix (macOS and Linux), every process belongs to a **Process Group**, identified by a **Process Group ID (`PGID`)**.
@@ -243,18 +252,18 @@ In Unix (macOS and Linux), every process belongs to a **Process Group**, identif
 
 Now, when a timeout or cancellation occurs, you kill the **entire process group at once** using the **negative PGID** (`os.killpg(pgid, sig)` or `kill(-pgid, sig)`):
 
-1. **Step 1 — Graceful `SIGTERM` to `-PGID`:** Tells the entire tree *"please shut down cleanly"*—giving databases, lockfiles (`.git/index.lock`), and temporary files a chance to clean up.
-2. **Step 2 — Short grace period (e.g., 2 to 5 seconds):** Wait for the process group to exit cleanly.
-3. **Step 3 — Forced `SIGKILL` to `-PGID`:** If anything ignored `SIGTERM` (very common for wedged native code or signal-trapping scripts), `SIGKILL` cannot be caught or ignored by any process—the kernel terminates every member of the group instantly.
-4. **Step 4 — Reap the child (`wait()`):** Always call `proc.wait()` after killing so the dead process entry doesn't linger in the kernel process table as a **zombie (`Z` state)**.
+1. **Step 1, Graceful `SIGTERM` to `-PGID`:** Tells the entire tree *"please shut down cleanly"*, giving databases, lockfiles (`.git/index.lock`), and temporary files a chance to clean up.
+2. **Step 2: Short grace period (e.g., 2 to 5 seconds):** Wait for the process group to exit cleanly.
+3. **Step 3 (Forced `SIGKILL` to `-PGID`:** If anything ignored `SIGTERM` (very common for wedged native code or signal-trapping scripts), `SIGKILL` cannot be caught or ignored by any process) the kernel terminates every member of the group instantly.
+4. **Step 4: Reap the child (`wait()`):** Always call `proc.wait()` after killing so the dead process entry doesn't linger in the kernel process table as a **zombie (`Z` state)**.
 
-> **Cross-platform note (Windows):** Windows does not have Unix `PGID`s. On Windows, production harnesses assign each spawned subprocess to a **Windows Job Object** configured with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` (or fall back to `taskkill /PID <pid> /T /F` to terminate the full `/T` tree). Closing the Job Object handle cleanly kills the entire descendant tree—even if the harness itself crashes.
+> **Cross-platform note (Windows):** Windows does not have Unix `PGID`s. On Windows, production harnesses assign each spawned subprocess to a **Windows Job Object** configured with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` (or fall back to `taskkill /PID <pid> /T /F` to terminate the full `/T` tree). Closing the Job Object handle cleanly kills the entire descendant tree, even if the harness itself crashes.
 
 ---
 
 ## 5. How Real Harnesses Do It
 
-Real-world coding agents have converged on surprisingly clear, battle-tested shell architectures—each reflecting deliberate trade-offs:
+Real-world coding agents have converged on surprisingly clear, battle-tested shell architectures: each reflecting deliberate trade-offs:
 
 - **OpenAI Codex CLI (`unified_exec`):**
   Codex CLI replaced split subprocess/shell paths with a dedicated PTY-based subsystem called `unified_exec`. It allocates interactive pseudo-terminals so shell commands behave like real developer terminals, wires execution directly through sandbox policies (Seatbelt on macOS, Landlock/seccomp on Linux) and approval gates, and tracks live background terminals via built-in controls like `/ps` and `/stop`.
@@ -287,7 +296,7 @@ Real-world coding agents have converged on surprisingly clear, battle-tested she
    *Fix:* Either serialize access to a persistent PTY with a mutex lock, or use stateless `exec` subprocesses for parallel read-only/independent commands.
 
 5. **Hardcoded sentinels in persistent PTYs:**
-   *Symptom:* The harness uses a static marker like `===DONE===`. The agent runs `grep "===DONE===" harness.py`—the PTY sees `===DONE===` mid-output, thinks the command finished early, and desynchronizes every future command in the session!
+   *Symptom:* The harness uses a static marker like `===DONE===`. The agent runs `grep "===DONE===" harness.py`: the PTY sees `===DONE===` mid-output, thinks the command finished early, and desynchronizes every future command in the session!
    *Fix:* Generate a fresh cryptographic random token (`secrets.token_hex(8)`) for every single command invocation.
 
 6. **Forgetting `TERM` or setting `TERM=dumb` blindly for PTY tools:**
@@ -448,7 +457,7 @@ Try testing `SafeShellRunner` against three real-world nasties:
 ## 8. Key Takeaways & Quick Self-Check
 
 - **Choose stateless `exec` vs. persistent PTY intentionally.** Stateless subprocesses give exact exit codes and safe parallel tool execution; persistent PTYs give stateful `cd`/`venv` continuity and interactive fidelity at the cost of sentinel framing and serialization.
-- **A PTY is a two-sided kernel pipe with terminal smarts.** It makes `isatty()` return `true`, enables line-buffered output, and runs a line discipline—but also introduces merged `stdout`/`stderr`, ANSI escape codes, and interactive prompts you must sanitize.
+- **A PTY is a two-sided kernel pipe with terminal smarts.** It makes `isatty()` return `true`, enables line-buffered output, and runs a line discipline, but also introduces merged `stdout`/`stderr`, ANSI escape codes, and interactive prompts you must sanitize.
 - **Snapshot the user's environment once and make state explicit.** Inheriting or snapshotting the login `$PATH` fixes mysterious `command not found` failures; explicitly tracking `cwd` and exact exit codes prevents silent agent confusion.
 - **Default to non-interactive armor so commands fail fast instead of hang.** Setting `PAGER=cat`, `GIT_TERMINAL_PROMPT=0`, `GIT_EDITOR=true`, `CI=true`, `DEBIAN_FRONTEND=noninteractive`, and closing `stdin` eliminates 90% of agent terminal freezes.
 - **Always spawn in a new session (`setsid`) and kill by `-PGID`.** Escalate `SIGTERM` → grace wait → `SIGKILL` across the entire process group and reap the child so no timed-out command leaves port-hogging orphans behind.

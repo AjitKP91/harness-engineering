@@ -46,7 +46,7 @@ function renderShell(app: HTMLElement): HTMLElement {
           <span>Search</span>
           <kbd>⌘K</kbd>
         </button>
-        <a class="progress-pill" id="header-progress-pill" href="#/roadmap" title="View roadmap">0/41</a>
+        <a class="progress-pill" id="header-progress-pill" href="#/roadmap" title="View roadmap">0/42</a>
         <button type="button" class="icon-btn theme-toggle" id="header-theme-btn" aria-label="Toggle color theme" title="Toggle light or dark theme">
           <span class="icon-sun" aria-hidden="true">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

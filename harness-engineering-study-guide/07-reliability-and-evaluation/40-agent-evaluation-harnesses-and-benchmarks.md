@@ -1,6 +1,6 @@
 > **Module 7: Reliability & Evaluation** | Prerequisites: Chapters 21, 37 & 38 | Reading Time: ~24 min
 >
-> [← 39. Model Routing & Rate-Limit Fallbacks](./39-model-routing-and-rate-limit-fallbacks.md) | [Table of Contents](../README.md) | [Plain-English Glossary →](../GLOSSARY.md)
+> [← 39. Model Routing & Rate-Limit Fallbacks](./39-model-routing-and-rate-limit-fallbacks.md) | [Table of Contents](../README.md) | [Next: 41. Putting It All Together →](./41-putting-it-all-together-end-to-end-walkthrough.md)
 
 # 40. Agent Evaluation Harnesses & Benchmarks
 
@@ -10,7 +10,7 @@ Now comes the hardest question in harness engineering: **How do you actually kno
 
 Suppose you rewrite your `edit_file` tool description, tighten output truncation from 200 lines to 80 lines, or swap your compaction prompt. You test it on two quick prompts on your laptop, both look great, and you ship it. A week later, users complain that the agent keeps breaking monorepo builds and getting stuck in loops.
 
-Welcome to the final chapter of this guide: **Agent Evaluation Harnesses & Benchmarks**—the engineering discipline that replaces guesswork and "vibes" with isolated, repeatable, cheat-proof evidence.
+Welcome to the final chapter of this guide: **Agent Evaluation Harnesses & Benchmarks**: the engineering discipline that replaces guesswork and "vibes" with isolated, repeatable, cheat-proof evidence.
 
 ---
 
@@ -31,7 +31,7 @@ An **agent evaluation harness** (often shortened to **eval harness**) is that cl
 - **Silent regressions:** Improving one prompt or tool quietly breaks 10 other workflows you forgot to manually check.
 - **Confusing luck with skill:** Because LLMs are non-deterministic, a broken change can still pass a single manual test by pure chance.
 - **Wasted engineering months:** Teams spend weeks debating prompt wording, tool schemas, or memory architectures without any objective way to tell which design actually moves the needle.
-- **Blind model upgrades:** When a new model drops, you have no way to verify whether it improves *your* specific harness—or whether your old prompt quirks actually make the new model worse.
+- **Blind model upgrades:** When a new model drops, you have no way to verify whether it improves *your* specific harness, or whether your old prompt quirks actually make the new model worse.
 
 ---
 
@@ -41,7 +41,7 @@ In classic software engineering, deterministic unit tests catch most bugs. In ag
 
 - **Harness changes rival model upgrades:** On real benchmarks like SWE-bench and Terminal-Bench, changing the *harness* (better edit tools, cleaner error feedback, smarter compaction, tighter LSP diagnostics) frequently swings task resolution rates by **10–25 percentage points** using the *exact same underlying LLM*.
 - **Long-horizon failures hide from short demos:** Bugs in context compaction (Chapter 10), tool truncation (Chapter 11), or doom-loop recovery (Chapter 05) almost never show up in a 3-turn laptop test. They only appear on Turn 35 of a messy multi-file debugging task inside an eval suite.
-- **Quality vs. Cost vs. Latency trade-offs:** A harness tweak that raises pass rate from 68% to 70% while doubling token spend and tripling wall-clock time might be a terrible trade for an interactive IDE agent—and a great trade for an overnight autonomous bug-fixer. Only an eval harness paired with telemetry (Chapter 38) reveals all three numbers together.
+- **Quality vs. Cost vs. Latency trade-offs:** A harness tweak that raises pass rate from 68% to 70% while doubling token spend and tripling wall-clock time might be a terrible trade for an interactive IDE agent, and a great trade for an overnight autonomous bug-fixer. Only an eval harness paired with telemetry (Chapter 38) reveals all three numbers together.
 
 ---
 
@@ -74,9 +74,9 @@ flowchart TD
 
 ### 4.1 Why "Vibes-Based Testing" Fails
 
-Every harness team starts with vibes-based testing: make a tweak, try 2 or 3 favorite prompts, and eyeball the output. That works for Day 1 prototyping—and fails catastrophically by Week 3. Here is why:
+Every harness team starts with vibes-based testing: make a tweak, try 2 or 3 favorite prompts, and eyeball the output. That works for Day 1 prototyping, and fails catastrophically by Week 3. Here is why:
 
-1. **Non-determinism hides regressions:** Even at low temperature, tool outputs, streaming timings, and model sampling create real run-to-run variance. A harness with a true 60% pass rate will pass 3 out of 3 manual checks $0.6^3 = 21.6\%$ of the time—and a *better* harness with a 75% pass rate will still fail at least once in 3 manual checks $57.8\%$ of the time! Your intuition literally cannot tell them apart from 3 runs.
+1. **Non-determinism hides regressions:** Even at low temperature, tool outputs, streaming timings, and model sampling create real run-to-run variance. A harness with a true 60% pass rate will pass 3 out of 3 manual checks $0.6^3 = 21.6\%$ of the time, and a *better* harness with a 75% pass rate will still fail at least once in 3 manual checks $57.8\%$ of the time! Your intuition literally cannot tell them apart from 3 runs.
 2. **Hidden side effects across layers:** Removing 15 lines from your system prompt might save tokens and look cleaner on a Python task, while silently causing the agent to forget to run `npm run build` on TypeScript tasks.
 3. **The "hill-climbing illusion":** Without a fixed benchmark suite, engineers repeatedly tweak prompts to fix *yesterday's* annoying bug, accidentally re-introducing *last month's* bug in an endless circle.
 4. **Inability to evaluate cost/speed regressions:** A new subagent or extra verification step might feel "smarter" while quietly quadrupling median tokens per resolved task.
@@ -85,7 +85,7 @@ Every harness team starts with vibes-based testing: make a tweak, try 2 or 3 fav
 
 ### 4.2 Anatomy of an Agent Evaluation Harness
 
-Every rigorous eval harness—whether SWE-bench, Harbor (Terminal-Bench), or an in-house company testbed—follows the same five-stage lifecycle:
+Every rigorous eval harness (whether SWE-bench, Harbor (Terminal-Bench), or an in-house company testbed) follows the same five-stage lifecycle:
 
 #### Stage 1: Self-Contained Task Packaging
 Each benchmark task is a self-contained folder with five explicit artifacts (here shown in the modern **Harbor / Terminal-Bench** layout):
@@ -130,8 +130,8 @@ Spin up a **brand-new container or microVM** (Chapter 21) for every single trial
 
 #### Stage 3: Instrumented Agent Run
 Invoke your real agent harness inside or against the container, recording:
-- Full append-only **JSONL trajectory** (every prompt, model response, tool call, and tool output—Chapter 37).
-- **Resource telemetry** (wall-clock duration, turns, input/output/cached tokens, dollar cost—Chapter 38).
+- Full append-only **JSONL trajectory** (every prompt, model response, tool call, and tool output: Chapter 37).
+- **Resource telemetry** (wall-clock duration, turns, input/output/cached tokens, dollar cost: Chapter 38).
 - **Termination reason** (`completed`, `timeout`, `max_turns`, `budget_exceeded`, `crash`).
 
 #### Stage 4: Clean-Room Hidden Grading
@@ -146,12 +146,12 @@ Never stop at one headline percentage! Aggregate pass rates across trials, slice
 
 ### 4.3 Key Coding Benchmarks (Public vs. Internal Evals)
 
-Public benchmarks let you compare your harness against the wider industry; private internal evals measure what actually pays your bills. Know what each major benchmark tests—and where it falls short:
+Public benchmarks let you compare your harness against the wider industry; private internal evals measure what actually pays your bills. Know what each major benchmark tests, and where it falls short:
 
 | Benchmark | What It Tests | Scale & Languages | Strengths | Key Limitations |
 | :--- | :--- | :--- | :--- | :--- |
 | **SWE-bench Verified** (Princeton / OpenAI) | Resolving real GitHub issues via repository-level code patches (`FAIL_TO_PASS` + `PASS_TO_PASS` unit tests). | 500 human-verified tasks from 12 Python repos. | Clean, well-understood baseline; huge ecosystem of comparable results. | Python-only; older public repos increasingly risk pre-training contamination and saturation. |
-| **SWE-bench Pro** (Scale AI) | Harder, long-horizon, multi-file engineering issues designed for enterprise realism. | 1,865 tasks across 41 repos (Python, Go, JS, TS) — split into Public (strong-copyleft GPL repos), Held-Out, and Commercial/Private startup codebases. | Multi-language; strongly contamination-resistant via copyleft & private commercial partitions. | Heavier compute & token cost per full run; commercial split is evaluated via Scale rather than locally. |
+| **SWE-bench Pro** (Scale AI) | Harder, long-horizon, multi-file engineering issues designed for enterprise realism. | 1,865 tasks across 41 repos (Python, Go, JS, TS): split into Public (strong-copyleft GPL repos), Held-Out, and Commercial/Private startup codebases. | Multi-language; strongly contamination-resistant via copyleft & private commercial partitions. | Heavier compute & token cost per full run; commercial split is evaluated via Scale rather than locally. |
 | **Terminal-Bench** (via **Harbor**) | End-to-end terminal & systems tasks: compiling C/Rust, debugging Linux services, DevOps, data pipelines, security fixes. | Broad containerized CLI task suites (`terminal-bench@2.0`, etc.). | Tests *full* agent environment manipulation, not just static `git diff` generation; clean standardized harness. | Requires full Docker/cloud container orchestration (Docker, Modal, Daytona) and careful sandbox security. |
 | **$\tau$-bench (tau-bench)** | Multi-turn interactive tool-use agents (retail/airline support) interacting with simulated users and live databases. | Multi-turn policy-constrained environments. | Pioneered `pass^k` reliability measurement and strict database-state grading. | Focuses on tool/policy adherence rather than software engineering codebases. |
 | **Custom Internal Repo Evals** | *Your* real codebase, *your* languages, *your* linters, *your* production bugs and PRs. | Start with 20–50 curated tasks; grow to 100–300 over time. | Zero contamination; 100% aligned with what your users actually care about. | Requires initial effort to turn past bugs/PRs into clean reproducible Docker tasks. |
@@ -162,7 +162,7 @@ Public benchmarks let you compare your harness against the wider industry; priva
 
 ### 4.4 Grading Methods: Outcomes, Checks, Judges & Trajectories
 
-In its influential engineering guide *"Demystifying Evals for AI Agents,"* Anthropic emphasizes a golden principle: **grade outcomes, not rigid paths—and combine fast deterministic code graders with calibrated model and human review.**
+In its influential engineering guide *"Demystifying Evals for AI Agents,"* Anthropic emphasizes a golden principle: **grade outcomes, not rigid paths, and combine fast deterministic code graders with calibrated model and human review.**
 
 Let's compare the four grading layers you can compose in one eval harness:
 
@@ -174,10 +174,10 @@ Let's compare the four grading layers you can compose in one eval harness:
 | **4. LLM-as-a-Judge (Model-Based)** | Grading a structured rubric on code readability, architectural cleanliness, explanation clarity, or partial-credit milestones. | 1–5s / Small API cost | Open-ended engineering tasks where unit tests alone cannot capture quality. | Verbosity bias, self-preference bias, and drift unless **calibrated against human labels**. |
 
 #### Grading Outcomes vs. Rigid Trajectories (Avoid the "Creative Agent Penalty")
-Suppose a task asks an agent to fix a broken API pagination bug. Your reference solution used `ripgrep` $\rightarrow$ `read_file` $\rightarrow$ `edit_file` $\rightarrow$ `pytest`. The agent instead ran `pytest` *first* to see the exact traceback, jumped straight to the file, patched it, and re-ran `pytest`—solving the task cleanly in half the tokens!
+Suppose a task asks an agent to fix a broken API pagination bug. Your reference solution used `ripgrep` $\rightarrow$ `read_file` $\rightarrow$ `edit_file` $\rightarrow$ `pytest`. The agent instead ran `pytest` *first* to see the exact traceback, jumped straight to the file, patched it, and re-ran `pytest`: solving the task cleanly in half the tokens!
 
 - A **rigid trajectory grader** asserting `calls[0].tool == "ripgrep"` marks this brilliant run as **FAIL**.
-- An **outcome + invariant grader** checks: (1) all hidden unit tests pass, (2) no test files were tampered with, (3) total cost < \$0.40, and (4) zero forbidden commands ran—marking it **PASS**.
+- An **outcome + invariant grader** checks: (1) all hidden unit tests pass, (2) no test files were tampered with, (3) total cost < \$0.40, and (4) zero forbidden commands ran; marking it **PASS**.
 
 #### Adding Partial Credit for Complex Tasks
 Binary `0` or `1` grading is crisp, but on very hard tasks where every candidate currently scores `0%`, binary scores give you **zero gradient** to see whether a change helped! Pair your primary binary pass score with structured **milestone credit** in `reward.json` (e.g., `0.25` reproduced bug, `0.25` code compiles & type-checks, `0.50` hidden tests pass) so you can track incremental progress on hard capability benchmarks.
@@ -186,14 +186,14 @@ Binary `0` or `1` grading is crisp, but on very hard tasks where every candidate
 Whenever you use an LLM grader:
 1. Give it a **concrete binary checklist** (yes/no criteria), not a vague *"rate 1 to 10"* prompt.
 2. **Isolate it from the solver model** (ideally use a different model family or strict rubric to reduce self-preference bias).
-3. **Calibrate against humans:** Have engineers manually grade 30–50 real transcripts first. Only trust the LLM judge in CI once its agreement with human graders exceeds ~85–90%—and re-check whenever you change the rubric.
+3. **Calibrate against humans:** Have engineers manually grade 30–50 real transcripts first. Only trust the LLM judge in CI once its agreement with human graders exceeds ~85–90%, and re-check whenever you change the rubric.
 
 ---
 
 ### 4.5 `pass@k` vs. `pass^k`, Data Contamination, Reward Hacking & CI Gating
 
 #### 1. Measuring Reliability Under Variance: `pass@k` vs. `pass^k`
-Because agents are stochastic, running each task once (`k = 1`) is noisy and hides flakiness. Two complementary metrics—highlighted in both $\tau$-bench and Anthropic's agent eval guide—tell two very different stories from $k$ independent trials of a task:
+Because agents are stochastic, running each task once (`k = 1`) is noisy and hides flakiness. Two complementary metrics, highlighted in both $\tau$-bench and Anthropic's agent eval guide, tell two very different stories from $k$ independent trials of a task:
 
 - **`pass@k` (Capability Ceiling):** The probability that the agent succeeds **at least once** in $k$ attempts.
   If a single trial has true success probability $p$:
@@ -219,7 +219,7 @@ $$\widehat{\text{pass}@k} = 1 - \frac{\binom{n - c}{k}}{\binom{n}{k}}$$
 And for `pass^k`, estimate with $\hat{p}^k = (c / n)^k$ (or track exact all-pass fraction across grouped blocks of $k$ runs).
 
 #### 2. Preventing Benchmark Reward Hacking
-Modern frontier coding agents are astonishingly resourceful—which means if your eval harness leaves a loophole open, an agent will *accidentally or opportunistically exploit it* to turn tests green without actually solving the problem!
+Modern frontier coding agents are astonishingly resourceful, which means if your eval harness leaves a loophole open, an agent will *accidentally or opportunistically exploit it* to turn tests green without actually solving the problem!
 
 Documented real-world reward hacks include:
 - **Test tampering:** Editing `pytest` fixtures, `conftest.py`, or `package.json` test scripts so the test runner exits `0` without running assertions.
@@ -228,14 +228,14 @@ Documented real-world reward hacks include:
 - **Hardcoding / Mocking the oracle:** Inspecting visible test cases or environment variables and returning hardcoded answers instead of fixing the underlying bug.
 
 **Five mandatory anti-cheat defenses:**
-1. **Zero hidden tests during agent runtime:** Never bake `tests/test.sh` or grading fixtures into the agent's Docker image. Inject them only *after* the agent is terminated—or extract only the agent's diff onto a brand-new grading image.
+1. **Zero hidden tests during agent runtime:** Never bake `tests/test.sh` or grading fixtures into the agent's Docker image. Inject them only *after* the agent is terminated, or extract only the agent's diff onto a brand-new grading image.
 2. **Diff allowlist / test-file freeze:** In patch-based evals (like SWE-bench), discard or reject any diff hunk that modifies the hidden grading test files; overwrite test files from the immutable base image before running verification.
-3. **Scrub `.git` completely:** Build task snapshots with a shallow, single-commit `git init` (or `git checkout --orphan`)—deleting all remotes, tags, reflogs, and future commit objects.
+3. **Scrub `.git` completely:** Build task snapshots with a shallow, single-commit `git init` (or `git checkout --orphan`); deleting all remotes, tags, reflogs, and future commit objects.
 4. **Offline containers (`--network=none`):** Block all direct container internet access. Route only the harness's LLM API calls through the host process outside the container.
 5. **Audit suspicious passes:** Automatically flag runs that finish suspiciously fast (e.g., 1 turn, 2-line diff touching test config) for quick human transcript inspection.
 
 #### 3. Preventing Data Contamination
-**Data contamination** occurs when public benchmark issues and fixes end up inside a foundation model's pre-training data—turning a reasoning test into a memory lookup.
+**Data contamination** occurs when public benchmark issues and fixes end up inside a foundation model's pre-training data, turning a reasoning test into a memory lookup.
 
 How teams stay ahead of contamination:
 - **Keep a private held-out suite:** Never publish your internal eval tasks to public GitHub repos, and opt out of vendor training data retention on your eval API keys.
@@ -265,8 +265,8 @@ Running 500 containerized tasks with $k=5$ trials on every pull request would co
 ## 6. Common Pitfalls & Failure Modes
 
 1. **Declaring Victory After `k = 1`:** Running a 30-task eval once and celebrating when score jumps from 63% to 67% (a single task flip!) is pure statistical noise. *Fix:* Run $k \ge 3$ trials per task and track variance (or expand task count before trusting small deltas).
-2. **Skipping the Oracle Check (`solve.sh`):** Teams often spend days debugging why their agent scores 0% on a new task—only to discover a broken `Dockerfile` or flaky test makes the task literally impossible! *Fix:* Require every task in your suite to pass an automated Oracle = `1.0` and Null Agent = `0.0` check in CI.
-3. **Leaving Hidden Tests or Git History Inside the Agent Container:** If `tests/test.sh` sits in `/tests` during agent execution, or `.git` contains the solution commit, frontier agents *will* find it—turning your benchmark score into a mirage. *Fix:* Clean-room post-run test injection, shallow scrubbed `.git`, and `--network=none`.
+2. **Skipping the Oracle Check (`solve.sh`):** Teams often spend days debugging why their agent scores 0% on a new task; only to discover a broken `Dockerfile` or flaky test makes the task literally impossible! *Fix:* Require every task in your suite to pass an automated Oracle = `1.0` and Null Agent = `0.0` check in CI.
+3. **Leaving Hidden Tests or Git History Inside the Agent Container:** If `tests/test.sh` sits in `/tests` during agent execution, or `.git` contains the solution commit, frontier agents *will* find it, turning your benchmark score into a mirage. *Fix:* Clean-room post-run test injection, shallow scrubbed `.git`, and `--network=none`.
 4. **Over-Strict Trajectory Grading:** Penalizing an agent because it used `find` instead of `glob`, or read files in a different order than your reference script, punishes smarter models. *Fix:* Grade final state/outcomes and restrict trajectory assertions to genuine safety, budget, and hygiene invariants.
 5. **Overfitting Your Harness to a Public Benchmark:** Stuffing system-prompt hacks tailored specifically to Django/SymPy quirks inflates your public SWE-bench Verified score while making your agent *worse* on your users' TypeScript/Go repos. *Fix:* Keep an unseen held-out internal suite that engineers never tune prompts against directly.
 6. **Uncalibrated LLM-as-a-Judge:** Asking a model *"Score this patch from 1 to 10"* produces noisy, verbosity-biased scores (longer explanations score higher even when the code is wrong!). *Fix:* Use deterministic tests first; when an LLM judge is needed, enforce crisp yes/no rubrics and calibrate agreement against human labels.
@@ -504,4 +504,4 @@ def evaluate_ci_gate(
 
 ---
 
-[← 39. Model Routing & Rate-Limit Fallbacks](./39-model-routing-and-rate-limit-fallbacks.md) | [Table of Contents](../README.md) | [Plain-English Glossary →](../GLOSSARY.md)
+[← 39. Model Routing & Rate-Limit Fallbacks](./39-model-routing-and-rate-limit-fallbacks.md) | [Table of Contents](../README.md) | [Next: 41. Putting It All Together →](./41-putting-it-all-together-end-to-end-walkthrough.md)

@@ -4,7 +4,7 @@
 
 # 02. Streaming & Event Parsing
 
-In Chapter 01, we treated `call_llm()` like a black box: send messages in, get a finished response out. If you build an agent that way—waiting for the entire response to arrive before showing anything—your user will stare at a frozen terminal for 15 to 45 seconds on every single turn, wondering whether the program crashed.
+In Chapter 01, we treated `call_llm()` like a black box: send messages in, get a finished response out. If you build an agent that way, waiting for the entire response to arrive before showing anything, your user will stare at a frozen terminal for 15 to 45 seconds on every single turn, wondering whether the program crashed.
 
 Modern LLM harnesses never wait for the full response. They consume a **live stream of incremental events** over HTTP, paint words and progress indicators on screen milliseconds after the model starts thinking, reassemble fragmented JSON tool arguments piece by piece, and let the user hit `Escape` the instant the agent heads in the wrong direction.
 
@@ -14,13 +14,13 @@ Modern LLM harnesses never wait for the full response. They consume a **live str
 
 Imagine calling a colleague to ask for directions to a restaurant.
 
-- **Non-streaming (waiting for a voicemail):** Your colleague records a 30-second audio message. You sit in total silence for 30 seconds, unable to tell if they are even speaking—and if they start giving directions to the *wrong* restaurant in second 3, you cannot interrupt them until the whole recording finishes downloading.
-- **Streaming (a live phone call):** You hear the very first word half a second after they start talking. You immediately know the line is alive, you can follow their train of thought in real time, and the moment they say *"Take Highway 9 north..."* you can jump in with *"Wait—I'm downtown, not by the airport!"*
+- **Non-streaming (waiting for a voicemail):** Your colleague records a 30-second audio message. You sit in total silence for 30 seconds, unable to tell if they are even speaking, and if they start giving directions to the *wrong* restaurant in second 3, you cannot interrupt them until the whole recording finishes downloading.
+- **Streaming (a live phone call):** You hear the very first word half a second after they start talking. You immediately know the line is alive, you can follow their train of thought in real time, and the moment they say *"Take Highway 9 north..."* you can jump in with *"Wait: I'm downtown, not by the airport!"*
 
 **What breaks if you don't stream properly?**
 1. **Terrible perceived latency:** Users assume an app is hung after ~2 seconds of silence, even if the model is faithfully writing a 2,000-token patch.
 2. **HTTP timeouts:** Proxies, corporate firewalls, and load balancers often kill silent HTTP connections after 30–60 seconds with `504 Gateway Timeout`. Streaming keeps bytes flowing continuously.
-3. **Broken tool calls:** When you *do* enable streaming, JSON tool arguments do not arrive as neat objects—they arrive chopped into tiny fragments like `{"pa`, `th": "src/`, `app.py"}`. If your parser mishandles chunks, UTF-8 characters, or interleaved blocks, your harness corrupts data or crashes mid-turn.
+3. **Broken tool calls:** When you *do* enable streaming, JSON tool arguments do not arrive as neat objects; they arrive chopped into tiny fragments like `{"pa`, `th": "src/`, `app.py"}`. If your parser mishandles chunks, UTF-8 characters, or interleaved blocks, your harness corrupts data or crashes mid-turn.
 
 ---
 
@@ -30,7 +30,7 @@ Streaming is not just a pretty typewriter animation. In an agent harness, it dir
 
 - **Time-To-First-Token (TTFT):** The delay from sending the request until the first token arrives. Non-streaming forces the user to wait for **total generation time** (`TTFT + output_tokens / tokens_per_sec`). On a 1,500-token reasoning + patch turn, streaming cuts perceived wait time from ~25 seconds down to ~0.6 seconds.
 - **Live Cancellation & Token Savings:** Every output token you generate costs money (typically 3x–5x more than input tokens). When a user sees the agent heading down the wrong path 100 tokens into a 2,000-token answer and hits `Ctrl+C`, aborting the HTTP stream immediately saves the remaining 1,900 output tokens and seconds of wasted time.
-- **Rich Multi-Channel UI:** Frontier models emit *three* distinct streams in a single turn: **private thinking/reasoning**, **visible prose**, and **structured tool calls**. Your streaming parser separates these channels so the UI can show a collapsible *"Thinking..."* panel, live Markdown prose, and a clean `"Reading src/auth.py..."` badge—never raw JSON spaghetti.
+- **Rich Multi-Channel UI:** Frontier models emit *three* distinct streams in a single turn: **private thinking/reasoning**, **visible prose**, and **structured tool calls**. Your streaming parser separates these channels so the UI can show a collapsible *"Thinking..."* panel, live Markdown prose, and a clean `"Reading src/auth.py..."` badge, never raw JSON spaghetti.
 - **Resilience Under Flaky Networks:** Long-running agent sessions *will* hit dropped Wi-Fi packets, mid-stream server overload errors, and slow terminal renderers. A solid stream parser handles malformed frames, disconnects, and backpressure without locking up or leaking memory.
 
 ---
@@ -39,30 +39,25 @@ Streaming is not just a pretty typewriter animation. In an agent harness, it dir
 
 Here is how raw network bytes travel through a streaming harness from the LLM provider's server to your agent loop and terminal UI:
 
-```text
-  LLM API Server (HTTP 200, Content-Type: text/event-stream)
-         |
-         |  Raw TCP byte chunks (arbitrary boundaries, may split UTF-8 or lines!)
-         v
-  +-------------------------------------------------------------------+
-  | 1. Byte Decoder + Line / SSE Frame Parser                         |
-  |    - TextDecoder({ stream: true }) handles split multi-byte UTF-8 |
-  |    - Buffers until blank line (\n\n) -> emits { event, data }     |
-  +---------------------------------+---------------------------------+
-                                    |  Parsed SSE JSON payloads
-                                    v
-  +-------------------------------------------------------------------+
-  | 2. Block Demultiplexer & Accumulator (State per block index)      |
-  |    +-------------------+-------------------+-------------------+  |
-  |    | Thinking Buffer   | Text Buffer       | Tool Args Buffer  |  |
-  |    | (text + signature)| (visible prose)   | (raw JSON string) |  |
-  |    +---------+---------+---------+---------+---------+---------+  |
-  +--------------|-------------------|-------------------|------------+
-                 |                   |                   |
-                 v                   v                   v
-        [UI: Thinking Pane]  [UI: Markdown Stream]  [Wait for block_stop
-                                                     -> JSON.parse(buf)
-                                                     -> Tool Dispatcher]
+```mermaid
+flowchart TD
+    Server["LLM API Server (HTTP 200, Content-Type: text/event-stream)"]
+    Decoder["1. Byte Decoder + Line / SSE Frame Parser\nTextDecoder(stream: true) handles split UTF-8;\nbuffers until blank line -> emits { event, data }"]
+    subgraph Demux["2. Block Demultiplexer & Accumulator (State per block index)"]
+        direction LR
+        Think["Thinking Buffer\n(text + signature)"]
+        Text["Text Buffer\n(visible prose)"]
+        Args["Tool Args Buffer\n(raw JSON string)"]
+    end
+    OutThink["UI: Thinking Pane"]
+    OutText["UI: Markdown Stream"]
+    OutTool["Wait for block_stop -> JSON.parse(buf)\n-> Tool Dispatcher"]
+
+    Server -->|"Raw TCP byte chunks"| Decoder
+    Decoder -->|"Parsed SSE JSON payloads"| Demux
+    Think --> OutThink
+    Text --> OutText
+    Args --> OutTool
 ```
 
 The golden rule of streaming parsers is **strict separation of layers**: Layer 1 only cares about HTTP/SSE framing; Layer 2 translates provider-specific events into a normalized stream and assembles complete blocks; Layer 3 (UI + agent loop) consumes clean typed events.
@@ -82,7 +77,7 @@ Let's put numbers on the difference streaming makes. Suppose a model takes **0.7
 | **Risk of 30s proxy idle timeout** | High on long code generations | Near zero (bytes + `ping` keepalives flow continuously) |
 | **Total wall-clock time to finish** | 20.7 seconds | 20.7 seconds (same total time, vastly better UX) |
 
-Streaming does not make the GPU run faster—it makes the **latency transparent** and gives both the human and the harness real-time visibility into what the model is doing.
+Streaming does not make the GPU run faster: it makes the **latency transparent** and gives both the human and the harness real-time visibility into what the model is doing.
 
 ---
 
@@ -147,7 +142,7 @@ Look at the exact SSE framing rules (defined by the WHATWG HTML Living Standard)
 
 ### 4.3 Reassembling Incremental JSON Deltas for Tool Arguments
 
-When an LLM calls a tool during streaming, it does **not** emit a valid JSON object on every event. It emits raw string fragments—sometimes a single character or half a key name at a time!
+When an LLM calls a tool during streaming, it does **not** emit a valid JSON object on every event. It emits raw string fragments, sometimes a single character or half a key name at a time!
 
 Look at a real Anthropic `tool_use` stream:
 
@@ -175,15 +170,15 @@ Notice four subtle traps here:
 2. **Wait for `content_block_stop` / `response.output_item.done` before running `JSON.parse()` for execution.**
    Never execute a tool from a half-accumulated JSON buffer. Only parse once the block closes *and* the overall stream did not end in truncation (`max_tokens` / `incomplete`).
 3. **Handle empty-argument tools gracefully!**
-   When a model calls a zero-argument tool like `get_git_status()`, some providers emit **zero** `input_json_delta` events—so your buffer is `""` (empty string) when `content_block_stop` arrives! Calling `JSON.parse("")` throws a syntax error. Always treat `buf.trim() === ""` as `{}`.
-4. **Optional UX polish — Partial JSON preview:**
-   When the model is streaming a 400-line file write inside `write_file(path, content)`, waiting 8 seconds with no UI movement feels slow. Some harnesses show a live preview using a *lenient partial JSON extractor* (only for display—never for actual execution!) or stream a simple byte counter (`"Writing src/auth.py... 1.4 KB"`).
+   When a model calls a zero-argument tool like `get_git_status()`, some providers emit **zero** `input_json_delta` events, so your buffer is `""` (empty string) when `content_block_stop` arrives! Calling `JSON.parse("")` throws a syntax error. Always treat `buf.trim() === ""` as `{}`.
+4. **Optional UX polish: Partial JSON preview:**
+   When the model is streaming a 400-line file write inside `write_file(path, content)`, waiting 8 seconds with no UI movement feels slow. Some harnesses show a live preview using a *lenient partial JSON extractor* (only for display, never for actual execution!) or stream a simple byte counter (`"Writing src/auth.py... 1.4 KB"`).
 
 ---
 
 ### 4.4 Separating Thinking/Reasoning Blocks, Visible Text, and Tool Call Blocks
 
-Modern reasoning models do not just output text and tool calls—they emit **structured reasoning blocks** before (or between) actions. A single assistant turn can contain all three block types in order:
+Modern reasoning models do not just output text and tool calls: they emit **structured reasoning blocks** before (or between) actions. A single assistant turn can contain all three block types in order:
 
 ```text
 Block 0: [thinking]   "The test fails with 200 instead of 401. Let me check jwt.py..."
@@ -191,7 +186,7 @@ Block 1: [text]       "I'll inspect the JWT verification logic in `src/auth/jwt.
 Block 2: [tool_use]   read_file(path="src/auth/jwt.py", start_line=1, end_line=80)
 ```
 
-Your streaming parser must route each block type cleanly—and obey **provider-specific preservation rules** that catch almost every developer the first time they integrate thinking models:
+Your streaming parser must route each block type cleanly, and obey **provider-specific preservation rules** that catch almost every developer the first time they integrate thinking models:
 
 1. **Anthropic Extended Thinking (`thinking_delta` + `signature_delta` + `redacted_thinking`):**
    - Thinking text streams via `thinking_delta`. Right before `content_block_stop`, Anthropic sends a cryptographic **`signature_delta`**.
@@ -224,11 +219,11 @@ data: {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}
 If your harness only checks `response.status === 200`, it will miss mid-stream errors completely. Always inspect `event === "error"` (or `payload.type === "error"` / `response.failed`) and feed it into your retry logic (Chapter 05).
 
 #### 2. Mid-Stream Disconnects & Silent Truncation
-Sometimes the TCP connection drops cleanly (EOF) *before* `message_stop` or `response.completed` arrives—no exception thrown, the iterator simply ends!
+Sometimes the TCP connection drops cleanly (EOF) *before* `message_stop` or `response.completed` arrives: no exception thrown, the iterator simply ends!
 - **Defense:** Track an explicit boolean `receivedTerminalEvent` (set to `true` only on `message_stop`, `response.completed`, `response.incomplete`, or a Gemini chunk with a non-empty `finishReason`). If the stream ends with `receivedTerminalEvent === false`, treat it as a **premature disconnect** (retryable network failure), never as a normal `end_turn`!
 
 #### 3. The OpenAI Responses API Truncation Quirk
-When hitting `max_output_tokens` mid-function-call, individual `output_item.done` events can occasionally fire before the outer `response.incomplete` event—meaning a tool argument string may be syntactically cut off even when its item closed.
+When hitting `max_output_tokens` mid-function-call, individual `output_item.done` events can occasionally fire before the outer `response.incomplete` event, meaning a tool argument string may be syntactically cut off even when its item closed.
 - **Defense:** Always wrap `JSON.parse(argBuffer)` in a `try/catch` *and* check the overall response's final `status` / `stop_reason` before dispatching any tool calls. Never assume `strict: true` prevents mid-stream token-limit truncation!
 
 #### 4. Malformed JSON Chunks
@@ -242,14 +237,14 @@ If you blindly trigger a full terminal redraw on every single `text_delta` event
 - CPU spikes to 100%, the terminal flickers wildly, and event queues pile up in RAM so cancellation feels laggy.
 - **Defense (two simple rules):**
   1. **Use pull-based async iteration** (`for await (const chunk of response.body)`) so TCP flow control naturally slows reading if the consumer pauses.
-  2. **Coalesce UI renders to a fixed frame budget** (e.g., buffer incoming text deltas in a string and flush to the terminal at most every **16–33ms**, ~30–60 FPS—we dive into TUI rendering in Chapter 34). Keep protocol parsing instant, and throttle only the screen redraws!
+  2. **Coalesce UI renders to a fixed frame budget** (e.g., buffer incoming text deltas in a string and flush to the terminal at most every **16–33ms**, ~30–60 FPS: we dive into TUI rendering in Chapter 34). Keep protocol parsing instant, and throttle only the screen redraws!
 
 ---
 
 ## 5. How Real Harnesses Do It
 
 - **Claude Code:** Streams Anthropic Messages SSE events and maintains a clean internal event bus separating thinking deltas, assistant prose, and tool-use input blocks. It preserves thinking blocks and their cryptographic `signature` verbatim across multi-turn tool calls, shows live spinners while tool JSON arguments stream in, and immediately aborts the underlying HTTP stream via `AbortController` when the user presses `Escape`.
-- **OpenAI Codex CLI:** Consumes OpenAI Responses API SSE streams (`response.output_item.added`, `response.output_text.delta`, `response.function_call_arguments.delta`, `response.output_item.done`, `response.completed`) inside its Rust core engine, converting them into strongly typed internal `Event` enums pushed over an async channel to the TUI—cleanly decoupling network parsing from terminal rendering and frame throttling.
+- **OpenAI Codex CLI:** Consumes OpenAI Responses API SSE streams (`response.output_item.added`, `response.output_text.delta`, `response.function_call_arguments.delta`, `response.output_item.done`, `response.completed`) inside its Rust core engine, converting them into strongly typed internal `Event` enums pushed over an async channel to the TUI; cleanly decoupling network parsing from terminal rendering and frame throttling.
 - **Gemini CLI:** Wraps Gemini's streaming API in a `Turn` stream generator inside `packages/core` that yields normalized `GeminiEventType` events (`Content`, `Thought`, `ToolCallRequest`, `Error`, `Finished`). It carefully retains `thoughtSignature` metadata on streamed parts so multi-turn tool calls stay valid, and detects empty or premature stream endings for automatic retry.
 - **OpenCode:** Normalizes streaming events across Anthropic, OpenAI, Gemini, and local OpenAI-compatible providers into one unified internal part stream (`text`, `reasoning`, `tool-call`), coalescing rapid deltas before persisting updates and rendering in the TUI.
 
@@ -500,7 +495,7 @@ Notice how clean the separation is: `parseSseFrames` knows *nothing* about LLMs,
 
 ## 8. Key Takeaways & Quick Self-Check
 
-- **Streaming fixes perceived latency, timeouts, and cancellation**—cutting wait time from total generation time down to Time-To-First-Token (TTFT) and letting users stop bad runs early.
+- **Streaming fixes perceived latency, timeouts, and cancellation**: cutting wait time from total generation time down to Time-To-First-Token (TTFT) and letting users stop bad runs early.
 - **Respect the wire protocol.** Buffer TCP chunks until blank-line SSE boundaries (`\n\n`) and always decode bytes with a stateful UTF-8 streaming decoder.
 - **Buffer tool JSON deltas per block index.** Only parse arguments once the block finishes (treating empty strings as `{}`), and always guard `JSON.parse()` against mid-stream truncation.
 - **Preserve thinking blocks and signatures verbatim.** Route thinking, visible prose, and tool calls to separate UI surfaces, but send thinking blocks + cryptographic signatures back untouched in multi-turn histories.
@@ -511,7 +506,7 @@ Notice how clean the separation is: `parseSseFrames` knows *nothing* about LLMs,
 **1. Why can a streaming LLM request fail *after* the server already returned HTTP `200 OK`?**
 <details>
 <summary>Show Answer</summary>
-In Server-Sent Events (SSE), the HTTP status line and headers are sent immediately when the stream opens—before the model finishes generating tokens. If the backend hits an overload or internal failure mid-generation, it cannot retroactively change the HTTP status code; instead, it emits an inline SSE <code>error</code> event or drops the TCP connection before sending the terminal event.
+In Server-Sent Events (SSE), the HTTP status line and headers are sent immediately when the stream opens, before the model finishes generating tokens. If the backend hits an overload or internal failure mid-generation, it cannot retroactively change the HTTP status code; instead, it emits an inline SSE <code>error</code> event or drops the TCP connection before sending the terminal event.
 </details>
 
 **2. A model calls two tools in parallel during a single streamed turn. What bug happens if you accumulate `input_json_delta` fragments into a single `let toolJson = ""` variable?**

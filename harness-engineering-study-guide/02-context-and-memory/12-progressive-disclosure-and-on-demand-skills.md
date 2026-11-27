@@ -8,7 +8,7 @@ In Chapters 07 through 11, you learned how to assemble a crisp system prompt, ke
 
 Now imagine your coding agent grows up. Your team connects it to GitHub, Jira, Slack, Postgres, AWS, and Sentry. On top of that, you write 40 internal playbooks covering everything from database migrations and React performance audits to Kubernetes rollbacks and PDF invoice parsing.
 
-If you hand the language model all 150 tool definitions and all 40 playbooks on Turn 1, **your agent immediately gets slower, more expensive, and noticeably dumber.** This chapter teaches the antidote: **progressive disclosure**—showing the agent a lightweight menu upfront and loading full instructions, reference docs, scripts, and niche tools *only when the current task actually calls for them*.
+If you hand the language model all 150 tool definitions and all 40 playbooks on Turn 1, **your agent immediately gets slower, more expensive, and noticeably dumber.** This chapter teaches the antidote: **progressive disclosure**: showing the agent a lightweight menu upfront and loading full instructions, reference docs, scripts, and niche tools *only when the current task actually calls for them*.
 
 ---
 
@@ -16,7 +16,7 @@ If you hand the language model all 150 tool definitions and all 40 playbooks on 
 
 ### The Master Mechanic's Workshop
 
-Picture a master auto mechanic standing in a busy repair shop. Around the shop are 300 specialized tools—bearing pullers, oscilloscope probes, torque angle gauges—and a whole shelf of 60 thick service manuals for every car model ever built.
+Picture a master auto mechanic standing in a busy repair shop. Around the shop are 300 specialized tools (bearing pullers, oscilloscope probes, torque angle gauges) and a whole shelf of 60 thick service manuals for every car model ever built.
 
 Does the mechanic strap all 300 tools and all 60 binders onto their back before greeting the first customer?
 
@@ -41,7 +41,7 @@ If your harness stuffs every guide and every tool schema into the initial prompt
 
 - **You pay a massive "hello tax":** Thousands of tokens are billed on every single request before the user even finishes their first sentence.
 - **The model picks the wrong tool:** Just like a human staring at a 120-item restaurant menu, an LLM loses precision when forced to choose among dozens of similar-looking tools (`search_issues`, `list_tickets`, `query_bugs`, `find_jira_tasks`).
-- **Unrelated instructions collide:** Your "Strict Python Type-Checking Guide" and your "Quick Bash Prototype Guide" sit side by side in the same prompt and subtly contradict each other—even when the user is editing a CSS file.
+- **Unrelated instructions collide:** Your "Strict Python Type-Checking Guide" and your "Quick Bash Prototype Guide" sit side by side in the same prompt and subtly contradict each other, even when the user is editing a CSS file.
 
 ---
 
@@ -60,14 +60,14 @@ Look closely at what that number means for a 200,000-token context window:
 
 1. **Over 40% of the context window is gone before the user says a word.** Remember Chapter 09's lesson on *context rot* (quality degrades well before a window hits 100% full). Starting at 40%+ utilization shrinks your effective working space dramatically.
 2. **Tool-selection accuracy drops past ~30–50 tools.** Both benchmarks and production harness telemetry show a consistent pattern: when you pass 100+ tool schemas into a single call, models confuse parameter names, pick overlapping tools, or forget required arguments far more often than when shown 5–15 relevant tools.
-3. **Latency and cost multiply across every turn.** Even with prompt caching (Chapter 08), writing an 83,000-token cache entry on cold starts adds noticeable **Time-To-First-Token (TTFT)** latency and extra cache-write cost—and if any single tool server reconnects with a slightly different list, the entire cache prefix invalidates.
+3. **Latency and cost multiply across every turn.** Even with prompt caching (Chapter 08), writing an 83,000-token cache entry on cold starts adds noticeable **Time-To-First-Token (TTFT)** latency and extra cache-write cost, and if any single tool server reconnects with a slightly different list, the entire cache prefix invalidates.
 
 Now compare that with progressive disclosure:
 
 - **Core tools (6 tools):** ~2,400 tokens
 - **Lightweight catalog of 25 skills (name + 1-sentence description):** ~1,500 tokens
 - **1 Tool Search meta-tool (covering all 108 deferred tools):** ~350 tokens
-- **Total Startup Overhead:** **~4,250 tokens** — a **~95% reduction** in upfront tokens!
+- **Total Startup Overhead:** **~4,250 tokens**: a **~95% reduction** in upfront tokens!
 
 When the user asks *"Open a GitHub pull request using our team's PR checklist"*, the agent loads *only* the `pr-checklist` skill (~900 tokens) and the `github_create_pull_request` schema (~400 tokens). The other 24 guides and 107 tools cost **zero tokens**.
 
@@ -105,7 +105,7 @@ flowchart TD
     Stage3 --> Done["Complete Task and Reply to User"]
 ```
 
-Notice the crucial architectural detail in Stage 2: newly loaded skills and discovered tool schemas are **appended to the conversation as tool outputs (or inline tool references)**—they do *not* rewrite the system prompt at the top of the message array. That preserves the immutable prefix you engineered in Chapter 08 so your prompt cache stays hot!
+Notice the crucial architectural detail in Stage 2: newly loaded skills and discovered tool schemas are **appended to the conversation as tool outputs (or inline tool references)**: they do *not* rewrite the system prompt at the top of the message array. That preserves the immutable prefix you engineered in Chapter 08 so your prompt cache stays hot!
 
 ---
 
@@ -115,7 +115,7 @@ Notice the crucial architectural detail in Stage 2: newly loaded skills and disc
 
 Why does "just throw it in the system prompt" fail so reliably as a harness scales? It hurts four separate mechanics of an LLM:
 
-1. **Attention Dilution:** Inside a transformer model, every output token computes attention weights across all input tokens. Adding 50,000 tokens of irrelevant deployment runbooks and Jira schemas acts like static noise on a radio—it dilutes the model's attention away from the actual user prompt and the specific bug on line 84.
+1. **Attention Dilution:** Inside a transformer model, every output token computes attention weights across all input tokens. Adding 50,000 tokens of irrelevant deployment runbooks and Jira schemas acts like static noise on a radio: it dilutes the model's attention away from the actual user prompt and the specific bug on line 84.
 2. **Schema Ambiguity & Near-Duplicates:** Enterprise toolsets are full of overlapping names (`slack_search_messages`, `slack_list_channel_history`, `slack_get_thread_replies`, plus `discord_*`, `teams_*`). Presenting all of them simultaneously invites wrong-tool errors and hallucinated parameter fields.
 3. **Instruction Contradiction:** Specialized workflows often override defaults. A "Database Migration Skill" might say *"Never run DDL statements automatically; always generate a SQL file for review"*, while a "Local Dev Seeding Skill" says *"Run schema reset scripts immediately."* Loaded together on Turn 1, they confuse the model about which rule governs the current task.
 4. **Hard Context Ceilings & Slower Cold Starts:** On smaller/faster models (which often have tighter context windows or stricter latency budgets), a 60k-token preamble makes fast routing or subagent delegation completely impractical.
@@ -132,16 +132,16 @@ Why does "just throw it in the system prompt" fail so reliably as a harness scal
 
 ### 4.2 The Progressive Disclosure Pattern
 
-**Progressive disclosure** is an old user-interface design principle: *show people only the summary they need to make their next decision, and reveal the deep details only when they click in.* Think of a website navigation bar—you see five clean headings instead of every paragraph on every page.
+**Progressive disclosure** is an old user-interface design principle: *show people only the summary they need to make their next decision, and reveal the deep details only when they click in.* Think of a website navigation bar; you see five clean headings instead of every paragraph on every page.
 
 In an agent harness, progressive disclosure operates in **three strict tiers**:
 
-1. **Tier 0 — The Index (Loaded at Session Start, ~30–100 tokens per item):**
+1. **Tier 0: The Index (Loaded at Session Start, ~30–100 tokens per item):**
    The harness scans installed skill folders and injects *only* each skill's name, one-line trigger description, and file path into the system prompt (or a dedicated `<available_skills>` section). For tools, only the 3–6 everyday core tools plus a tool-search capability are loaded.
-2. **Tier 1 — Activation (Loaded When Relevant, ~500–3,000 tokens):**
+2. **Tier 1: Activation (Loaded When Relevant, ~500–3,000 tokens):**
    When the model recognizes that the user's request matches a skill's description (for example, *"migrate our Postgres users table"* matches `postgres-migrations`), it reads the full `SKILL.md` file (or invokes a `load_skill` tool). Similarly, if it needs an external tool, it queries the tool search tool and receives the full JSON schemas for only the top 3–5 matches.
-3. **Tier 2 — Deep Resources & Executable Scripts (Loaded Only If Needed, 0 to ∞ tokens):**
-   A well-written skill does not dump a 40-page API reference inside `SKILL.md`. Instead, `SKILL.md` says: *"For rollback procedures on partitioned tables, read `references/partitioned-rollbacks.md`. To validate migration safety deterministically, run `scripts/lint_migration.py`."* If the user's migration doesn't touch partitioned tables, that reference file is **never read at all**. Even better: when the agent runs `scripts/lint_migration.py`, the script's *code* never even needs to enter the context window—only its short pass/fail output does!
+3. **Tier 2: Deep Resources & Executable Scripts (Loaded Only If Needed, 0 to ∞ tokens):**
+   A well-written skill does not dump a 40-page API reference inside `SKILL.md`. Instead, `SKILL.md` says: *"For rollback procedures on partitioned tables, read `references/partitioned-rollbacks.md`. To validate migration safety deterministically, run `scripts/lint_migration.py`."* If the user's migration doesn't touch partitioned tables, that reference file is **never read at all**. Even better: when the agent runs `scripts/lint_migration.py`, the script's *code* never even needs to enter the context window; only its short pass/fail output does!
 
 > **Cache-Preservation Rule:** Always deliver Tier 1 and Tier 2 content as normal `tool_result` messages appended to the end of the conversation history. Never splice newly activated skills back into message #0 (the system prompt), or you will bust your prompt cache for the entire conversation so far.
 
@@ -220,7 +220,7 @@ Look how clean that is:
 
 ### 4.4 Dynamic Tool Search & Deferred Tool Loading
 
-Skills solve **instruction bloat**. What about **tool schema bloat**—when your agent is connected to 10 MCP servers exposing 150 tools?
+Skills solve **instruction bloat**. What about **tool schema bloat**: when your agent is connected to 10 MCP servers exposing 150 tools?
 
 The answer is **deferred tool loading** paired with a **tool search meta-tool**. Instead of sending all 150 tool definitions in the prompt, you mark niche tools as *deferred* (invisible to the model initially) and give the model a single search tool to discover them on demand.
 
@@ -235,7 +235,7 @@ Starting in late 2025, Anthropic introduced native support for deferred tools di
 3. **Add a server-side Tool Search Tool:** Anthropic provides two built-in search engines:
    - **Regex variant (`tool_search_tool_regex_20251119`):** The model writes a Python-style regex (`re.search`, up to 200 chars) such as `(?i)github.*pull_request` to match tool names, descriptions, and arguments. Great when tool names follow predictable prefixes.
    - **BM25 variant (`tool_search_tool_bm25_20251119`):** The model writes a natural-language query such as `"create pull request review comment"`. **BM25 (Best Matching 25)** is a classic, super-fast keyword relevance ranking algorithm (the same family used in search engines like Elasticsearch). Great when tool catalogs are large or inconsistently named.
-4. **On-demand expansion via `tool_reference` blocks:** When Claude calls the tool search tool, the API returns a small batch (typically 3–5) of `tool_reference` blocks, which the API automatically expands into full callable tool definitions for subsequent turns—*without* breaking the cached system prefix!
+4. **On-demand expansion via `tool_reference` blocks:** When Claude calls the tool search tool, the API returns a small batch (typically 3–5) of `tool_reference` blocks, which the API automatically expands into full callable tool definitions for subsequent turns, *without* breaking the cached system prefix!
 
 Here is a concrete API request payload using both individual deferred tools and an `mcp_toolset`:
 
@@ -330,7 +330,7 @@ Here is how the four disclosure strategies trade off:
 
 ## 5. How Real Harnesses Do It
 
-Progressive disclosure is no longer a research idea—it is standard architecture in modern coding agents:
+Progressive disclosure is no longer a research idea: it is standard architecture in modern coding agents:
 
 - **Claude Code:**
   - Discovers `SKILL.md` directories across built-in, plugin, user (`~/.claude/skills/`), and project (`.claude/skills/`) scopes. At startup, only each skill's compact YAML frontmatter (`name` + `description`) is injected into the context; the full `SKILL.md` body loads only when Claude triggers the skill (or the user invokes `/skill-name`).
@@ -347,7 +347,7 @@ Progressive disclosure is no longer a research idea—it is standard architectur
 ## 6. Common Pitfalls & Failure Modes
 
 ### Pitfall 1: Vague Skill Descriptions Cause Silent Non-Triggering
-- **Bad:** `description: Helps with deployment tasks.` (Too generic—the model ignores it when a user says *"My Helm chart is failing in staging."*).
+- **Bad:** `description: Helps with deployment tasks.` (Too generic; the model ignores it when a user says *"My Helm chart is failing in staging."*).
 - **Good:** `description: Debug, validate, and deploy Kubernetes manifests and Helm charts. Use when editing values.yaml, Chart.yaml, k8s deployments, or investigating staging/prod pod crash loops. Do NOT use for local Docker Compose.`
 - **Fix:** Test your skill descriptions like search queries against 10 realistic user prompts (both positive triggers and negative non-triggers).
 
@@ -358,7 +358,7 @@ Progressive disclosure is no longer a research idea—it is standard architectur
 
 ### Pitfall 3: Turning `SKILL.md` Into a 12,000-Token Monolith
 - **Mistake:** Stuffing an entire SDK reference manual, 20 JSON examples, and a FAQ into `SKILL.md`. The moment the skill activates, it blows out the context budget.
-- **Fix:** Keep `SKILL.md` concise (ideally **150–400 lines**)—just the workflow steps, hard rules, and a short table of pointers to files under `references/` and deterministic helpers under `scripts/`.
+- **Fix:** Keep `SKILL.md` concise (ideally **150–400 lines**); just the workflow steps, hard rules, and a short table of pointers to files under `references/` and deterministic helpers under `scripts/`.
 
 ### Pitfall 4: Deferring Core Everyday Tools
 - **Mistake:** Marking *every* tool (including `read_file` and `grep`) with `defer_loading: true` to chase a vanity "0 upfront tokens" metric.
@@ -558,7 +558,7 @@ class ToolRegistry:
 ```
 
 **Why this mini-lab works so well in production:**
-- **Deterministic sorting** (`sorted(..., key=...)`) ensures your startup `<available_skills>` block and eager `tools` array produce byte-identical prefixes across sessions—maximizing prompt cache hits.
+- **Deterministic sorting** (`sorted(..., key=...)`) ensures your startup `<available_skills>` block and eager `tools` array produce byte-identical prefixes across sessions: maximizing prompt cache hits.
 - **Namespace summaries** inside `search_tools` cost ~30 tokens yet tell the model *what worlds exist* behind the search bar.
 - **Zero prefix mutation:** Every discovered skill or tool enters the conversation cleanly as a normal `tool_result`.
 
@@ -587,7 +587,7 @@ class ToolRegistry:
    <details>
    <summary>Show Answer</summary>
 
-   Two reasons: **reliability and token efficiency.** LLMs are probabilistic and can make subtle mistakes on deterministic tasks like linting SQL lock patterns, parsing PDFs, or validating schemas. Running a local script executes with 100% deterministic accuracy, and the script's source code never even needs to enter the context window—only its compact stdout/stderr output does.
+   Two reasons: **reliability and token efficiency.** LLMs are probabilistic and can make subtle mistakes on deterministic tasks like linting SQL lock patterns, parsing PDFs, or validating schemas. Running a local script executes with 100% deterministic accuracy, and the script's source code never even needs to enter the context window: only its compact stdout/stderr output does.
 
    </details>
 
@@ -595,7 +595,7 @@ class ToolRegistry:
    <details>
    <summary>Show Answer</summary>
 
-   You hit the **invisible capability** failure mode—the model had no clue Jira tools were hidden behind `search_tools`. The cheapest fix (~20–40 tokens) is to include a compact list of connected namespaces and counts (e.g., `jira (14), github (22), sentry (10)`) directly in the `search_tools` description or system prompt so the model knows *when* to search.
+   You hit the **invisible capability** failure mode: the model had no clue Jira tools were hidden behind `search_tools`. The cheapest fix (~20–40 tokens) is to include a compact list of connected namespaces and counts (e.g., `jira (14), github (22), sentry (10)`) directly in the `search_tools` description or system prompt so the model knows *when* to search.
 
    </details>
 

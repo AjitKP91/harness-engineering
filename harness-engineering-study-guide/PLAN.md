@@ -88,7 +88,7 @@ Every topic guide follows the same humane, beginner-friendly progression:
   - Designing cache-aware harnesses (append-only history, stable tool registries, cache hit-rate monitoring)
 - [x] **09. Context Window Budgeting** (`02-context-and-memory/09-context-window-budgeting.md`)
   - Tokens vs. characters vs. words; how tokenizers work and why counts vary by model
-  - Context rot / "lost in the middle" — why filling 100% of the window hurts quality
+  - Context rot / "lost in the middle": why filling 100% of the window hurts quality
   - Partitioning the budget (system prompt, tool schemas, pinned files, history, headroom for output/thinking)
   - Counting tokens locally vs. API usage metadata
   - Trigger thresholds (soft warning, proactive pruning, hard compaction)
@@ -151,7 +151,7 @@ Every topic guide follows the same humane, beginner-friendly progression:
   - Event-driven notifications vs. wasteful LLM polling loops (`sleep` anti-pattern)
   - Cleanup guarantees when a session ends or crashes
 - [x] **19. Model Context Protocol (MCP) Client Architecture** (`03-tools-and-workspace-interaction/19-model-context-protocol-mcp-client-architecture.md`)
-  - What MCP solves (the $M \times N$ integration problem — "USB-C for AI tools")
+  - What MCP solves (the $M \times N$ integration problem: "USB-C for AI tools")
   - MCP primitives: Tools, Resources, Prompts, and Sampling
   - Transports: `stdio` (local subprocesses) vs. Streamable HTTP (remote servers)
   - Lifecycle handshake (`initialize`), capability negotiation, namespacing, and reconnection
@@ -169,9 +169,9 @@ Every topic guide follows the same humane, beginner-friendly progression:
 - [x] **21. OS-Level Sandboxing (macOS Seatbelt, Linux Bubblewrap/Landlock, Containers)** (`04-sandboxing-and-security/21-os-level-sandboxing-seatbelt-bubblewrap-landlock-containers.md`)
   - Why "asking the LLM politely not to run `rm -rf /`" is not security
   - Defense in depth: process isolation vs. OS sandboxes vs. containers vs. microVMs (Firecracker/Apple Virtualization)
-  - macOS Seatbelt (`sandbox-exec` / SBPL profiles) — how it works and its caveats
+  - macOS Seatbelt (`sandbox-exec` / SBPL profiles): how it works and its caveats
   - Linux Bubblewrap (`bwrap` namespaces) and Landlock LSM (unprivileged kernel-enforced filesystem/network rules)
-  - Container/VM sandboxes (Docker, gVisor, Kata, microVMs) — startup speed vs. isolation strength
+  - Container/VM sandboxes (Docker, gVisor, Kata, microVMs): startup speed vs. isolation strength
 - [x] **22. Filesystem & Network Isolation** (`04-sandboxing-and-security/22-filesystem-and-network-isolation.md`)
   - Workspace-scoped read/write rules, read-only system mounts, and writable scratch `/tmp`
   - Protecting sensitive host paths (`~/.ssh`, `~/.aws`, browser profiles, `.git/hooks`, `.env`)

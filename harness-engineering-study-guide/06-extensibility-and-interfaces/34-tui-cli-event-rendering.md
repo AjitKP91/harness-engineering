@@ -4,9 +4,9 @@
 
 # 34. TUI / CLI Event Rendering
 
-You can build the smartest agent loop in the world—with rock-solid sandboxing, crisp prompt caching, and lightning-fast tool calls—and developers will still abandon it in five minutes if the terminal flickers like a broken neon sign, corrupts their scrollback, hides what the agent is doing, or breaks the moment they pipe output into `jq` in CI.
+You can build the smartest agent loop in the world (with rock-solid sandboxing, crisp prompt caching, and lightning-fast tool calls) and developers will still abandon it in five minutes if the terminal flickers like a broken neon sign, corrupts their scrollback, hides what the agent is doing, or breaks the moment they pipe output into `jq` in CI.
 
-The terminal is where coding agents live. Yet a terminal is **not** a web browser. It has no built-in DOM, no native CSS layout engine, no pixel buffer, and no guarantee that a human is even looking at it (half the time, your "user" is a GitHub Actions runner). Turning a firehose of live LLM tokens, parallel tool calls, and code diffs into a calm, readable, responsive terminal experience—and cleanly switching to machine-readable output when running headless—is a craft in its own right.
+The terminal is where coding agents live. Yet a terminal is **not** a web browser. It has no built-in DOM, no native CSS layout engine, no pixel buffer, and no guarantee that a human is even looking at it (half the time, your "user" is a GitHub Actions runner). Turning a firehose of live LLM tokens, parallel tool calls, and code diffs into a calm, readable, responsive terminal experience, and cleanly switching to machine-readable output when running headless, is a craft in its own right.
 
 ---
 
@@ -16,8 +16,8 @@ Imagine you are watching a live football match. On the field, chaotic events hap
 
 How does a television network show that to you without giving you a headache?
 
-1. **The game itself never draws pixels.** Players play on the field; spotters log structured events (*"14:22 — Goal scored by #9"*).
-2. **The TV graphics engine** subscribes to those events and turns them into a clean visual scoreboard at the bottom of the screen, animated replays, and tidy stat panels—updating smoothly at 30 frames per second rather than flashing wildly every millisecond.
+1. **The game itself never draws pixels.** Players play on the field; spotters log structured events (*"14:22; Goal scored by #9"*).
+2. **The TV graphics engine** subscribes to those events and turns them into a clean visual scoreboard at the bottom of the screen, animated replays, and tidy stat panels: updating smoothly at 30 frames per second rather than flashing wildly every millisecond.
 3. **Meanwhile, a news wire** subscribes to the *exact same event feed* and emits plain structured lines (`{"minute":14,"event":"goal","player":9}`) for newspapers and bots that do not have a screen at all.
 
 An agent harness works the exact same way:
@@ -35,11 +35,11 @@ An agent harness works the exact same way:
 
 ## 2. Why This Matters in a Real Agent Harness
 
-Good terminal rendering is not cosmetic polish—it directly shapes **trust, speed, and usability**:
+Good terminal rendering is not cosmetic polish: it directly shapes **trust, speed, and usability**:
 
 - **Perceived Latency & Trust:** A coding agent may think for 4 seconds, read 6 files, and run a 20-second test suite. If the screen sits frozen, developers assume it hung and hit `Ctrl+C`. Streaming text deltas, live spinners with elapsed timers, and compact tool-status lines reassure the user that real progress is happening.
 - **Cognitive Load & Reviewability:** A single agent turn can execute 12 tool calls producing 8,000 lines of raw output. Dumping all 8,000 lines into the terminal buries the one 5-line diff the developer actually needs to approve. Collapsible tool panels and syntax-highlighted diffs let humans review changes in seconds.
-- **Terminal Hygiene:** Terminals have sticky global state (raw input mode, hidden cursors, alternate screen buffers). If your harness crashes without restoring that state, the user's shell is left broken—typing shows nothing and Enter stops working—until they manually run `reset`.
+- **Terminal Hygiene:** Terminals have sticky global state (raw input mode, hidden cursors, alternate screen buffers). If your harness crashes without restoring that state, the user's shell is left broken, typing shows nothing and Enter stops working, until they manually run `reset`.
 - **CI / Script Composability:** Modern teams run coding agents both interactively at their desk *and* headlessly in CI (automated PR reviews, test triage, release notes). One clean event stream powers both modes with zero duplicated business logic.
 
 ---
@@ -88,7 +88,7 @@ Developers spend hours staring at your agent's terminal output. Four UI building
    ✓ Read src/auth.ts (lines 1–120)                                 18ms
    ✓ Bash: pytest tests/test_auth.py (14 passed)                   1.8s
      ↳ Press Ctrl+O to expand full output (84 lines)
-   ⠋ Edit src/auth.ts — updating token expiry check...             0.4s
+   ⠋ Edit src/auth.ts: updating token expiry check...             0.4s
    ```
    While a tool is running, show a rolling tail preview (e.g., the last 3–5 lines of live command output). Once it succeeds, collapse it to a single green summary line; if it *fails*, automatically keep the error tail expanded so the developer sees what broke immediately.
 
@@ -99,14 +99,14 @@ Developers spend hours staring at your agent's terminal output. Four UI building
 
 ### 4.2 Terminal Architecture Basics
 
-To build a reliable TUI, you need to understand five low-level terminal mechanics that have existed since the 1970s VT100 hardware terminal—and still power Ghostty, iTerm2, Kitty, Alacritty, and Windows Terminal today.
+To build a reliable TUI, you need to understand five low-level terminal mechanics that have existed since the 1970s VT100 hardware terminal, and still power Ghostty, iTerm2, Kitty, Alacritty, and Windows Terminal today.
 
 #### 1. TTY vs. Non-TTY (`isatty`)
 A **TTY** (short for *teletypewriter*, now a virtual terminal device like `/dev/ttys004`) connects your program to a live human terminal screen. When someone runs `my-agent | tee log.txt` or runs your agent in GitHub Actions, `stdout` is connected to a **pipe** or **file**, not a TTY.
 - Always check `process.stdout.isTTY` (Node/TS) or `sys.stdout.isatty()` (Python) before emitting ANSI cursor movements, spinners, or raw-mode prompts.
 
 #### 2. ANSI Escape Sequences
-A terminal does not have a `setColor()` function call. You control colors, cursor position, and clearing by writing special invisible byte sequences starting with the **ESC** character (`\x1b`, ASCII 27) followed by `[`—called a **CSI (Control Sequence Introducer)**:
+A terminal does not have a `setColor()` function call. You control colors, cursor position, and clearing by writing special invisible byte sequences starting with the **ESC** character (`\x1b`, ASCII 27) followed by `[`: called a **CSI (Control Sequence Introducer)**:
 
 | Sequence | Name | What It Does |
 | :--- | :--- | :--- |
@@ -145,7 +145,7 @@ Whenever a user drags their terminal window wider or splits a `tmux` pane, the o
 
 The single cleanest architectural decision you can make for your harness interface is **strict separation between event production and event rendering**.
 
-Instead of passing UI callbacks or printing strings inside your agent loop, define a **discriminated union** of typed events—every state change in the harness becomes an immutable data object:
+Instead of passing UI callbacks or printing strings inside your agent loop, define a **discriminated union** of typed events: every state change in the harness becomes an immutable data object:
 
 ```typescript
 // events.ts — The contract between the Agent Engine and ANY renderer
@@ -172,7 +172,7 @@ export interface EventSink {
 
 Look at what this buys you immediately:
 - **Zero coupling:** You can swap Ink for Ratatui, or swap a TUI for a CI JSON writer, without changing a single line of agent loop code.
-- **Fan-out for free:** Attach three sinks at once—`TuiRenderer` (for the human), `TranscriptSink` (appending every event to `.jsonl` on disk—Chapter 37), and `TelemetrySink` (recording OpenTelemetry spans—Chapter 38).
+- **Fan-out for free:** Attach three sinks at once (`TuiRenderer` (for the human), `TranscriptSink` (appending every event to `.jsonl` on disk) Chapter 37), and `TelemetrySink` (recording OpenTelemetry spans; Chapter 38).
 - **Deterministic UI testing:** You can record a real session's event stream to a `.jsonl` file and replay it into your TUI at 10x speed to visually test edge cases (long diffs, rapid parallel tools, sudden errors) without spending a penny on LLM API calls!
 
 ---
@@ -184,14 +184,14 @@ A great CLI agent is a **first-class Unix citizen**. Developers want to run it i
 #### 1. Detecting Headless Mode Automatically
 Enter non-interactive mode whenever **any** of these is true:
 - The user passes a print/headless flag (`-p "Explain this diff"`, `--print`, `exec`).
-- `stdout` is not a TTY (`!process.stdout.isTTY`)—e.g., redirected to a file or piped to `jq`.
+- `stdout` is not a TTY (`!process.stdout.isTTY`): e.g., redirected to a file or piped to `jq`.
 - `CI=true` is set in the environment and no interactive TTY is attached.
 
 #### 2. Output Formats (`text`, `json`, `stream-json`)
 Support three clean machine-friendly output modes:
 
 - **`--output-format text` (default when piped):** Prints *only* the final assistant answer to `stdout` with **zero ANSI escape codes** and **zero spinners**, so `git diff | agent -p "Write a commit message" > COMMIT_MSG` works seamlessly.
-- **`--output-format json`:** Buffers until the run finishes and prints a single JSON object containing the final answer, session ID, token usage, cost, and duration—ideal for simple scripts (`jq -r .result`).
+- **`--output-format json`:** Buffers until the run finishes and prints a single JSON object containing the final answer, session ID, token usage, cost, and duration; ideal for simple scripts (`jq -r .result`).
 - **`--output-format stream-json` (NDJSON / JSONL):** Prints **one complete JSON object per line** as events happen in real time. CI dashboards, parent orchestrators, and custom wrappers can parse each line incrementally without waiting for a 5-minute run to finish:
 
 ```json
@@ -207,7 +207,7 @@ Support three clean machine-friendly output modes:
 - Respect the community **`NO_COLOR`** environment variable (if `NO_COLOR` is set and non-empty, strip all ANSI color codes even in a TTY) and `FORCE_COLOR` when explicitly requested.
 
 #### 4. Semantic Exit Codes
-Shell scripts and CI pipelines branch on exit codes (`$?`). Do not return `1` for everything—distinguish retryable infrastructure failures from permission blocks and user bugs:
+Shell scripts and CI pipelines branch on exit codes (`$?`). Do not return `1` for everything: distinguish retryable infrastructure failures from permission blocks and user bugs:
 
 | Exit Code | Meaning | Typical CI Action |
 | :--- | :--- | :--- |
@@ -261,7 +261,7 @@ This is the #1 bug that breaks handmade TUIs. Suppose you want to draw a neat 40
 | `"e\u0301"` (`é`) | `2` | `1` | Combining accents occupy **0 extra columns** over the base letter. |
 | `"\t"` | `1` | `1–8` | Tabs jump to the next tab stop; always expand tabs to spaces before layout. |
 
-If your width calculation is off by even 1 column, a single emoji in a user's git branch name or a CJK comment in a code diff causes a line to wrap unexpectedly, shifting the cursor down an extra row—so your next `\x1b[5A` cursor-up lands on the wrong line and smears ghost artifacts across the terminal!
+If your width calculation is off by even 1 column, a single emoji in a user's git branch name or a CJK comment in a code diff causes a line to wrap unexpectedly, shifting the cursor down an extra row, so your next `\x1b[5A` cursor-up lands on the wrong line and smears ghost artifacts across the terminal!
 
 **The fix:** Always strip ANSI codes first, split text into **grapheme clusters** (`Intl.Segmenter` in JS/TS; `unicode-segmentation` in Rust), and sum terminal column widths using a Unicode East Asian Width table (`string-width` in JS/TS, `unicode-width` in Rust, `wcwidth` in Python).
 
@@ -269,12 +269,12 @@ If your width calculation is off by even 1 column, a single emoji in a user's gi
 
 ## 5. How Real Harnesses Do It
 
-Modern production coding agents show a fascinating convergence—and real trade-offs—in TUI architecture:
+Modern production coding agents show a fascinating convergence, and real trade-offs, in TUI architecture:
 
 - **Claude Code (Anthropic):** Built in TypeScript using **React + Ink** (React reconciler targeting terminal layout via Yoga flexbox). Historically, Claude Code used an inline scrollback layout (committing finished items with Ink's `<Static>` while redrawing the active bottom area). Rapid streaming in large terminals exposed Ink's classic redraw flicker, leading Anthropic to adopt **DEC Mode 2026 synchronized output** (with `CLAUDE_CODE_FORCE_SYNC_OUTPUT=1`) and introduce a full **alternate-screen renderer** (`/tui fullscreen` or `CLAUDE_CODE_NO_FLICKER=1`) that keeps memory flat and eliminates strobing, paired with `Ctrl+O` for in-app transcript search. For CI and scripts, `claude -p` supports `--output-format json` and `--output-format stream-json` (NDJSON) along with semantic exit codes (`0`, `1`, `3` auth, `4` permission, `5` rate limit, `6` network).
 - **Gemini CLI (Google):** Also built on **React + Ink**, carefully optimizing render passes and supporting alternate-screen rendering for smooth multi-line prompts, sticky headers, and diff previews. Its headless mode (`-p` / `--prompt` with `--output-format stream-json`) bypasses the Ink renderer entirely and emits a clean JSONL stream of typed events (`init`, `message`, `tool_use`, `tool_result`, `error`, `result`) directly to `stdout`.
-- **OpenAI Codex CLI:** Written in Rust (`codex-tui`) on top of **Ratatui** and **Crossterm**. Rather than taking over the whole screen or fighting virtual-DOM overhead, Codex uses Ratatui's **inline viewport** and differential cell-grid rendering—drawing live spinners, syntax-highlighted diffs, and approval boxes inside a bounded bottom viewport while pushing finalized history cleanly into native terminal scrollback. Crucially, `codex-tui` consumes the exact same structured event model that `codex app-server` exposes over JSON-RPC.
-- **OpenCode:** Originally built in Go with Charm's **Bubble Tea** (The Elm Architecture: pure `Model → Update → View` loop), and later evolved to **OpenTUI**—a high-performance native rendering core in Zig with TypeScript/SolidJS bindings and Yoga flexbox layout. OpenCode treats its TUI strictly as a thin client subscribing to a local background server's SSE event stream (which we explore in detail in Chapter 35).
+- **OpenAI Codex CLI:** Written in Rust (`codex-tui`) on top of **Ratatui** and **Crossterm**. Rather than taking over the whole screen or fighting virtual-DOM overhead, Codex uses Ratatui's **inline viewport** and differential cell-grid rendering: drawing live spinners, syntax-highlighted diffs, and approval boxes inside a bounded bottom viewport while pushing finalized history cleanly into native terminal scrollback. Crucially, `codex-tui` consumes the exact same structured event model that `codex app-server` exposes over JSON-RPC.
+- **OpenCode:** Originally built in Go with Charm's **Bubble Tea** (The Elm Architecture: pure `Model → Update → View` loop), and later evolved to **OpenTUI**: a high-performance native rendering core in Zig with TypeScript/SolidJS bindings and Yoga flexbox layout. OpenCode treats its TUI strictly as a thin client subscribing to a local background server's SSE event stream (which we explore in detail in Chapter 35).
 
 ---
 
@@ -293,7 +293,7 @@ Modern production coding agents show a fascinating convergence—and real trade-
    *Symptom:* A user runs a verbose build inside the agent; the TUI keeps 500,000 raw log lines in React/TUI state, causing multi-second keystroke lag.
    *Fix:* Cap live tool panels to a fixed ring buffer (e.g., last 200 lines in UI memory) and write the full output to an artifact file on disk (Chapter 11).
 5. **Forgetting Bracketed Paste:**
-   *Symptom:* User pastes a 20-line stack trace into the prompt box, and the agent immediately submits 20 separate prompts—one per newline!
+   *Symptom:* User pastes a 20-line stack trace into the prompt box, and the agent immediately submits 20 separate prompts; one per newline!
    *Fix:* Enable bracketed paste (`\x1b[?2004h`) and treat newlines arriving between `\x1b[200~` and `\x1b[201~` as literal text insertions rather than submit triggers.
 6. **Hanging Forever in CI on an Approval Prompt:**
    *Symptom:* A GitHub Actions job times out after 6 hours because the agent printed `Allow bash command? [y/N]` to a non-interactive runner.
@@ -464,7 +464,7 @@ async function main() {
 main();
 ```
 
-Try running it twice—once directly in your terminal (`npx tsx mini-renderer.ts`) to see the live spinner and flicker-free updates, and once piped (`npx tsx mini-renderer.ts | jq .`) to watch it automatically switch to clean NDJSON without touching the event producer!
+Try running it twice: once directly in your terminal (`npx tsx mini-renderer.ts`) to see the live spinner and flicker-free updates, and once piped (`npx tsx mini-renderer.ts | jq .`) to watch it automatically switch to clean NDJSON without touching the event producer!
 
 ---
 
@@ -481,7 +481,7 @@ Try running it twice—once directly in your terminal (`npx tsx mini-renderer.ts
 1. **Why does wrapping a terminal redraw in DEC Mode 2026 (`\x1b[?2026h` ... `\x1b[?2026l`) eliminate screen flickering?**
    <details>
    <summary>Show Answer</summary>
-   Without synchronized output, a terminal emulator repaints the screen on its own refresh cycle—which can land halfway between your app erasing old lines and writing new lines, causing visible blank flashes or tearing. DEC Mode 2026 tells the terminal to buffer all incoming ANSI writes until the closing sequence arrives, then paint the entire updated frame atomically in a single refresh.
+   Without synchronized output, a terminal emulator repaints the screen on its own refresh cycle, which can land halfway between your app erasing old lines and writing new lines, causing visible blank flashes or tearing. DEC Mode 2026 tells the terminal to buffer all incoming ANSI writes until the closing sequence arrives, then paint the entire updated frame atomically in a single refresh.
    </details>
 
 2. **What is the core UX trade-off between rendering a coding agent in the Alternate Screen Buffer versus Inline Scrollback?**
@@ -499,7 +499,7 @@ Try running it twice—once directly in your terminal (`npx tsx mini-renderer.ts
 4. **A teammate runs your coding agent in GitHub Actions with `--output-format stream-json`, and their `jq` pipeline crashes on startup. What are the two most likely culprits?**
    <details>
    <summary>Show Answer</summary>
-   (1) Non-JSON text—such as a startup banner, update warning, debug `console.log`, or ANSI escape codes—was accidentally written to `stdout` instead of `stderr`. (2) The agent tried to open an interactive TUI or print a human approval prompt instead of detecting headless/non-TTY mode.
+   (1) Non-JSON text (such as a startup banner, update warning, debug `console.log`, or ANSI escape codes) was accidentally written to `stdout` instead of `stderr`. (2) The agent tried to open an interactive TUI or print a human approval prompt instead of detecting headless/non-TTY mode.
    </details>
 
 ---

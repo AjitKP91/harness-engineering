@@ -4,7 +4,7 @@
 
 # 06. Session & Turn State Machines
 
-Look back at the simple `while True:` agent loop from Chapter 01. It fits in 20 lines of code and feels wonderfully clean—until real humans start using your app.
+Look back at the simple `while True:` agent loop from Chapter 01. It fits in 20 lines of code and feels wonderfully clean, until real humans start using your app.
 
 Suddenly, a user hits **Ctrl+C** halfway through a streaming response. Another user walks away for ten minutes while an approval prompt (`Allow rm -rf build? [y/N]`) is waiting on screen. A laptop battery dies in the middle of tool execution, and the user runs `--resume` the next morning expecting to pick up right where they left off. Or the user types a follow-up message *while* the agent is compacting its context window.
 
@@ -16,7 +16,7 @@ An ad-hoc `while` loop wrapped in a pile of boolean flags (`isRunning`, `isWaiti
 
 Think of an **automatic washing machine**.
 
-A washing machine doesn't just run a messy checklist with random booleans like `isSpinning = true` and `doorOpen = true` at the same time—because if both were true simultaneously, your laundry room would flood! Instead, the machine can only be in **one clear, named state at any moment**:
+A washing machine doesn't just run a messy checklist with random booleans like `isSpinning = true` and `doorOpen = true` at the same time, because if both were true simultaneously, your laundry room would flood! Instead, the machine can only be in **one clear, named state at any moment**:
 - `IDLE` (door unlocked, waiting for you to press Start)
 - `FILLING` (door locked, water flowing in)
 - `WASHING` (agitating clothes)
@@ -43,7 +43,7 @@ A **Session & Turn State Machine** gives your AI agent harness the exact same di
 You have now built the core execution pieces of Module 1: the ReAct loop, streaming, tool schemas, parallel execution, and error recovery. The **Session & Turn State Machine** is the skeleton that holds all of them together safely:
 
 - **Decouples Engine from UI:** Whether your harness renders in a terminal (TUI), an IDE sidebar, a desktop app, or a headless CI runner, the UI simply subscribes to state transitions (`idle → streaming → awaiting_approval → executing_tools → idle`) instead of guessing what the agent is doing.
-- **Guarantees Protocol Invariants:** LLM APIs enforce strict structural rules on message history (valid role alternation, paired `tool_use`/`tool_result` blocks). A state machine ensures a turn is **committed atomically** or **repaired cleanly** on cancellation—never left half-written.
+- **Guarantees Protocol Invariants:** LLM APIs enforce strict structural rules on message history (valid role alternation, paired `tool_use`/`tool_result` blocks). A state machine ensures a turn is **committed atomically** or **repaired cleanly** on cancellation, never left half-written.
 - **Makes Crash Recovery & `--resume` Trivial:** When every completed turn and state event is written durably to disk, closing your terminal, upgrading the CLI, or losing power never destroys an hour of agent context.
 
 ---
@@ -138,7 +138,7 @@ Here are the 7 core states every real coding-agent harness needs, what happens i
 
 | State | What Is Happening Right Now? | User Input Allowed? | Cleanup Required on Abort? |
 | :--- | :--- | :--- | :--- |
-| **`idle`** | Resting between turns; waiting for the user. | Yes — submit new prompt, `/compact`, `/resume`, or exit. | None. |
+| **`idle`** | Resting between turns; waiting for the user. | Yes: submit new prompt, `/compact`, `/resume`, or exit. | None. |
 | **`streaming`** | Waiting on LLM HTTP/SSE response; accumulating text, thinking, and tool-call JSON deltas. | Cancel (`Ctrl+C`) or queue a "steer" message for after this turn. | Abort HTTP stream; **discard** incomplete assistant message (do not commit partial tool calls). |
 | **`awaiting_approval`** | Model requested a sensitive tool (e.g., shell command or write); paused for human `[Allow / Deny]`. | Approve, Deny, or Cancel (`Ctrl+C`). | Emit synthetic `"Denied/Cancelled by user"` `tool_result` for every pending `tool_use_id`. |
 | **`executing_tools`** | Running approved tools (in parallel/serial batches per Ch. 04). | Cancel (`Ctrl+C`) or queue follow-up message. | Fire `AbortSignal`, kill child process groups, and emit synthetic `"Cancelled"` `tool_result`s for unfinished calls. |
@@ -170,7 +170,7 @@ const ALLOWED_TRANSITIONS: Record<SessionState, readonly SessionState[]> = {
 };
 ```
 
-If any code path tries an illegal jump—say, `executing_tools → idle` without emitting results, or `idle → awaiting_approval`—the state machine throws immediately during development rather than silently corrupting a user's session in production.
+If any code path tries an illegal jump (say, `executing_tools → idle` without emitting results, or `idle → awaiting_approval`) the state machine throws immediately during development rather than silently corrupting a user's session in production.
 
 ---
 
@@ -192,7 +192,7 @@ Look at the three exact moments a user can hit `Ctrl+C`, and what the clean hist
 | Moment of `Ctrl+C` | What Was In-Flight? | Clean History Repair Strategy |
 | :--- | :--- | :--- |
 | **1. Mid-stream (before any tool started)** | Partial text + half-finished `tool_use` JSON. | **Option A (Simplest):** Discard the partial assistant message entirely, or keep only the already-streamed *plain text* (stripping any incomplete `tool_use` blocks) + append a note `"[Interrupted by user]"`. |
-| **2. During `awaiting_approval`** | Complete assistant message with `tool_use_1`, `tool_use_2`; user hadn't approved yet. | Commit the assistant message **paired with** synthetic `tool_result` blocks (`is_error: true`, `"Interrupted by user before approval"`) for *every* `tool_use_id`—**OR** roll back the uncommitted assistant message completely. |
+| **2. During `awaiting_approval`** | Complete assistant message with `tool_use_1`, `tool_use_2`; user hadn't approved yet. | Commit the assistant message **paired with** synthetic `tool_result` blocks (`is_error: true`, `"Interrupted by user before approval"`) for *every* `tool_use_id`, **OR** roll back the uncommitted assistant message completely. |
 | **3. Mid-`executing_tools` (1 of 3 tools already finished)** | `tool_use_1` already edited a file; `tool_use_2` is running; `tool_use_3` hasn't started. | **Do NOT erase `tool_use_1`!** The file on disk was already changed, so the model *needs* to know! Abort `tool_use_2`, kill its subprocess, and commit the assistant message paired with: real result for `tool_use_1` + synthetic `"Cancelled by user"` results for `tool_use_2` and `tool_use_3`. |
 
 That third case is a classic senior-engineer insight: **never lie to the model about side effects that already happened on disk.** Keeping `tool_use_1`'s real result alongside cancelled results for `tool_use_2` and `tool_use_3` keeps both the conversation protocol *and* the model's mental model of the workspace 100% accurate.
@@ -295,7 +295,7 @@ How should a harness store sessions on disk? Let's compare the three dominant pe
 
 | Format | How It Works | Pros | Cons | Used By |
 | :--- | :--- | :--- | :--- | :--- |
-| **Append-Only JSONL** (`.jsonl` — one JSON object per line) | Each event (session metadata, user prompt, assistant turn, tool result, compaction snapshot) is appended as a single line + flushed. | Crash-safe (a crash mid-write only truncates the last line, never the whole file); trivial to stream, grep, tail, and fork; human-readable. | Requires scanning the file on `--resume` (fast for <50 MB); updates are represented as new events. | **Claude Code**, **OpenAI Codex CLI** (`RolloutRecorder`), **Gemini CLI** |
+| **Append-Only JSONL** (`.jsonl`: one JSON object per line) | Each event (session metadata, user prompt, assistant turn, tool result, compaction snapshot) is appended as a single line + flushed. | Crash-safe (a crash mid-write only truncates the last line, never the whole file); trivial to stream, grep, tail, and fork; human-readable. | Requires scanning the file on `--resume` (fast for <50 MB); updates are represented as new events. | **Claude Code**, **OpenAI Codex CLI** (`RolloutRecorder`), **Gemini CLI** |
 | **SQLite Database** (`sessions.db` in WAL mode) | Relational tables for `sessions`, `messages`, `tool_calls`, `parts`. | Instant indexed queries across thousands of sessions; ACID transactions; easy full-text search across past chats. | Binary file (needs `sqlite3` CLI to inspect); schema migrations required as harness evolves. | **OpenCode** |
 | **Single Monolithic JSON File** (`session.json`) | Rewrites the entire conversation JSON on every turn. | Simple for tiny toy scripts. | **Dangerous in production:** a crash mid-write corrupts the entire file unless you write-to-temp + atomic `rename()`, and rewriting megabytes every turn is slow. | Toy prototypes (avoid unless using atomic temp+rename) |
 
@@ -320,7 +320,7 @@ Each line is a self-contained event with a schema version, timestamp, and unique
 ## 5. How Real Harnesses Do It
 
 - **OpenAI Codex CLI (`codex-rs`):** Models turns with an explicit per-turn `TurnContext` (capturing working directory, sandbox policy, model config, and approval mode) and persists every turn item, tool call, tool output, and state event through **`RolloutRecorder`** into append-only JSONL files. Because every event is logged sequentially, Codex supports `--resume`, thread forking, and deterministic replay straight from the rollout log.
-- **Claude Code:** Persists per-project sessions as append-only JSONL files under `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl`, where each record carries parent/child UUID links—allowing branching, compaction summaries, and `--resume` / `--continue`. Pressing `Escape` or `Ctrl+C` during generation or tool execution cancels the active turn cleanly and returns the prompt to `idle` rather than exiting the CLI.
+- **Claude Code:** Persists per-project sessions as append-only JSONL files under `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl`, where each record carries parent/child UUID links, allowing branching, compaction summaries, and `--resume` / `--continue`. Pressing `Escape` or `Ctrl+C` during generation or tool execution cancels the active turn cleanly and returns the prompt to `idle` rather than exiting the CLI.
 - **Gemini CLI (`google-gemini/gemini-cli`):** Separates the interactive terminal UI (React/Ink) from the core turn/tool engine (`GeminiClient` + `CoreToolScheduler`). Every tool invocation moves through an explicit `toolCallStatus` state machine (`validating` → `awaiting_approval` → `scheduled` → `executing` → `success` / `error` / `cancelled`), making approval prompts, live cancellation, and UI rendering completely deterministic.
 - **OpenCode:** Persists sessions, messages, and typed message parts (text, reasoning, tool invocations, tool states) into a structured local store so multiple UI clients (terminal TUI, desktop app, web UI) can attach to, pause, and resume the same session cleanly without losing state.
 
@@ -330,7 +330,7 @@ Each line is a self-contained event with a schema version, timestamp, and unique
 
 1. **Stale session locks after a hard crash (`kill -9` or power loss):**
    - *Symptom:* The user runs `agent --resume` after a crash and gets `"Error: Session ID already in use"`, permanently locked out of their own work.
-   - *Fix:* Store `{pid, started_at, hostname}` inside the lock file—or use OS advisory locks (`flock` / `fcntl`), which the OS kernel automatically releases the instant a process dies!
+   - *Fix:* Store `{pid, started_at, hostname}` inside the lock file, or use OS advisory locks (`flock` / `fcntl`), which the OS kernel automatically releases the instant a process dies!
 
 2. **Forgetting to strip incomplete `tool_use` blocks on mid-stream abort:**
    - *Symptom:* User hits `Ctrl+C` while the model is streaming a giant `write_file` argument. The harness saves the half-parsed `tool_use` block, and the next API request fails because the arguments aren't valid JSON and there is no `tool_result`.
@@ -599,7 +599,7 @@ export class AgentSession {
 }
 ```
 
-Notice the elegance of `commitMessage(assistantMsg)` immediately followed by `commitMessage({ role: "user", content: results })`—plus `repairHistory()` on every cancellation, error, and crash reload. Even if the process is killed with `SIGKILL` between those two disk appends, `loadAndRepair()` heals the orphan `tool_use` automatically on `--resume`!
+Notice the elegance of `commitMessage(assistantMsg)` immediately followed by `commitMessage({ role: "user", content: results })`, plus `repairHistory()` on every cancellation, error, and crash reload. Even if the process is killed with `SIGKILL` between those two disk appends, `loadAndRepair()` heals the orphan `tool_use` automatically on `--resume`!
 
 ---
 
@@ -607,7 +607,7 @@ Notice the elegance of `commitMessage(assistantMsg)` immediately followed by `co
 
 - **Replace boolean soup with a Finite State Machine:** Model explicit states (`idle`, `streaming`, `awaiting_approval`, `executing_tools`, `compacting`, `cancelled`, `error`) and enforce legal transitions in one place.
 - **Make `Ctrl+C` cancel the turn, not the whole app:** Use an `AbortController` per turn to transition cleanly through `cancelled → idle`, preserving session continuity.
-- **Guard message invariants religiously:** Never leave an orphan `tool_use`, an orphan `tool_result`, or broken role alternation—and always run a deterministic `repairHistory()` pass on load and after aborts.
+- **Guard message invariants religiously:** Never leave an orphan `tool_use`, an orphan `tool_result`, or broken role alternation, and always run a deterministic `repairHistory()` pass on load and after aborts.
 - **Don't erase real side effects on cancellation:** If tool #1 already modified a file before the user cancelled tool #2, keep tool #1's real result and mark tool #2 as cancelled so the model's view matches reality.
 - **Persist append-only JSONL (or WAL SQLite) to disk:** Flush per event, tolerate a torn final line on crash recovery, and use PID-checked or OS-advisory locks so crashes never lock users out of `--resume`.
 

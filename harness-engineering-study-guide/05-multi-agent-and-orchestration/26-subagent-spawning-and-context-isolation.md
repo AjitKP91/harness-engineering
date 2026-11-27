@@ -10,9 +10,9 @@ Now ask that single agent to tackle a real, messy engineering task:
 
 > *"Audit our billing, auth, and webhook services for race conditions, check whether our React checkout page handles duplicate clicks, fix every issue you find, and verify the full test suite."*
 
-Watch what happens inside a **single** context window. To investigate billing, the agent runs 15 `ripgrep` searches and reads 12 files—adding 45,000 tokens of raw code, dead-end grep hits, and stack traces. Then it investigates auth (+35,000 tokens). Then webhooks (+30,000 tokens). Then it inspects the browser DOM (+25,000 tokens). By the time it tries to write the actual fix, its working desk is buried under **135,000 tokens of exploratory clutter**, half of which turned out to be irrelevant. The model gets slower, pays for those 135,000 tokens on *every single turn*, triggers lossy compaction (Chapter 10), and forgets an edge case it noticed twenty minutes ago.
+Watch what happens inside a **single** context window. To investigate billing, the agent runs 15 `ripgrep` searches and reads 12 files: adding 45,000 tokens of raw code, dead-end grep hits, and stack traces. Then it investigates auth (+35,000 tokens). Then webhooks (+30,000 tokens). Then it inspects the browser DOM (+25,000 tokens). By the time it tries to write the actual fix, its working desk is buried under **135,000 tokens of exploratory clutter**, half of which turned out to be irrelevant. The model gets slower, pays for those 135,000 tokens on *every single turn*, triggers lossy compaction (Chapter 10), and forgets an edge case it noticed twenty minutes ago.
 
-The architectural cure is **subagent spawning and context isolation**—splitting one overwhelmed generalist into a focused parent agent that delegates messy work to isolated child agents.
+The architectural cure is **subagent spawning and context isolation**: splitting one overwhelmed generalist into a focused parent agent that delegates messy work to isolated child agents.
 
 ---
 
@@ -21,16 +21,16 @@ The architectural cure is **subagent spawning and context isolation**—splittin
 Imagine a senior tech lead planning a major database migration in a small office.
 
 - **Without delegation:** The tech lead personally walks through four different buildings, grabs 80 thick paper binders, drags every single binder back to their tiny desk, and piles them six feet high. Half of the binders turn out to be outdated billing spreadsheets from 2022. Now the tech lead cannot even find their original checklist, and every time they need to make a decision, they have to shuffle through 80 binders first.
-- **With subagents:** The tech lead stays at a **clean desk** with the master plan. They send three specialists into separate rooms—each room has a **fresh, empty whiteboard**:
+- **With subagents:** The tech lead stays at a **clean desk** with the master plan. They send three specialists into separate rooms: each room has a **fresh, empty whiteboard**:
   - Specialist A inspects the billing service and comes back with a **one-page memo**: *"Found 2 race conditions at `billing/charge.py:114` and `billing/refund.py:88`. Here are the exact causes."*
   - Specialist B inspects the auth service and comes back with a **half-page memo**: *"No race conditions found; token refresh already uses a Redis lock at `auth/tokens.py:42`."*
   - Specialist C checks the browser checkout page and returns a **short bug report** with a screenshot.
 
-When the specialists leave their rooms, all 80 binders and scratched-out whiteboard notes stay behind in those rooms—**they never touch the tech lead's desk**. The tech lead reads three crisp memos totaling two pages, sees the full picture clearly, and makes sharp decisions.
+When the specialists leave their rooms, all 80 binders and scratched-out whiteboard notes stay behind in those rooms: **they never touch the tech lead's desk**. The tech lead reads three crisp memos totaling two pages, sees the full picture clearly, and makes sharp decisions.
 
 **What breaks if a harness has no subagents?**
 - **Context pollution ("context rot"):** Dead-end searches, verbose logs, and giant files stay in the main conversation forever, drowning out the user's real instructions.
-- **Quadratic token bills:** Because LLM APIs re-read the entire conversation history on every turn, carrying 100,000 tokens of stale exploration through 30 editing turns costs **3,000,000 input tokens**—even with prompt caching, you pay extra latency and hit context limits early.
+- **Quadratic token bills:** Because LLM APIs re-read the entire conversation history on every turn, carrying 100,000 tokens of stale exploration through 30 editing turns costs **3,000,000 input tokens**: even with prompt caching, you pay extra latency and hit context limits early.
 - **Sequential bottlenecks:** A single agent loop reads one module after another in serial; subagents can explore three modules at the exact same time.
 - **Over-privileged exploration:** A single agent doing read-only research still carries destructive tools (`run_command`, `edit_file`, `git push`) in its schema, widening the blast radius of prompt injection (Chapter 24).
 
@@ -38,16 +38,16 @@ When the specialists leave their rooms, all 80 binders and scratched-out whitebo
 
 ## 2. Why This Matters in a Real Agent Harness
 
-In modern coding harnesses, subagents are not a gimmick for "AI roleplay" ("pretend you are a 10x ninja architect"). They are a **systems-engineering primitive**—the agent equivalent of spawning a child process with its own virtual memory space.
+In modern coding harnesses, subagents are not a gimmick for "AI roleplay" ("pretend you are a 10x ninja architect"). They are a **systems-engineering primitive**: the agent equivalent of spawning a child process with its own virtual memory space.
 
 Subagent isolation directly improves four concrete metrics:
 
 1. **Reasoning Quality (Signal-to-Noise Ratio):** As we saw in Chapter 09, even models with 200k–1M token windows suffer accuracy drops as irrelevant tokens accumulate. Keeping the parent context lean preserves razor-sharp instruction following across multi-hour tasks.
 2. **Parallelism & Wall-Clock Speed:** Exploring three subsystems, running four independent code reviews, or triaging five failing test suites concurrently turns a 10-minute serial search into a 2-minute parallel sweep.
 3. **Cost Optimization via Model Tiering:** Not every step needs your most expensive frontier reasoning model. A fast, inexpensive model (e.g., Haiku-, Flash-, or Mini-class) can run 25 `grep` and `read_file` calls in an isolated subagent for pennies, handing a distilled 800-token summary back to the frontier parent model.
-4. **Least-Privilege Security Boundaries:** A read-only researcher subagent literally does not receive `write_file` or `run_command` in its tool list—making accidental mutations or prompt-injected shell execution structurally impossible during exploration.
+4. **Least-Privilege Security Boundaries:** A read-only researcher subagent literally does not receive `write_file` or `run_command` in its tool list, making accidental mutations or prompt-injected shell execution structurally impossible during exploration.
 
-> **Reality check on token economics:** Anthropic's published research on multi-agent systems notes that spawning multiple parallel subagents can use significantly more *total* tokens than a single linear chat (often 3× to 15× depending on fan-out) because each subagent builds its own context. You use subagents when **task complexity, context hygiene, or wall-clock parallelism** justifies that spend—not for every trivial one-file edit.
+> **Reality check on token economics:** Anthropic's published research on multi-agent systems notes that spawning multiple parallel subagents can use significantly more *total* tokens than a single linear chat (often 3× to 15× depending on fan-out) because each subagent builds its own context. You use subagents when **task complexity, context hygiene, or wall-clock parallelism** justifies that spend, not for every trivial one-file edit.
 
 ---
 
@@ -97,12 +97,12 @@ Over **99% of the tokens added during exploration are scaffolding and dead ends*
 1. Your conversation now carries **106,000 tokens** before the agent has edited a single line of code.
 2. If the agent takes 20 more turns to write code and iterate on tests, every turn re-processes that 106,000-token boulder (even with prompt caching, cache-read fees and prefill latency scale with prefix length).
 3. Worse, the model's attention mechanism must filter past 93,000 tokens of obsolete search results, increasing the chance it edits the wrong copy of a helper function or forgets a subtle constraint from turn 1.
-4. Eventually the harness hits its compaction threshold (Chapter 10) and summarizes the whole thread—potentially losing details from the user's original prompt.
+4. Eventually the harness hits its compaction threshold (Chapter 10) and summarizes the whole thread: potentially losing details from the user's original prompt.
 
 Now compare the **subagent version**:
 - Three read-only subagents absorb the 32k, 24k, and 38k tokens inside their own temporary contexts (using a cheaper, faster model).
 - Each returns a structured ~300-token report.
-- The parent context grows from **12,000 tokens to ~13,500 tokens**—a **98.5% reduction in parent context bloat**!
+- The parent context grows from **12,000 tokens to ~13,500 tokens**: a **98.5% reduction in parent context bloat**!
 
 ---
 
@@ -110,7 +110,7 @@ Now compare the **subagent version**:
 
 A subagent starts with a **blank slate** (an empty conversation array containing only its role's system prompt and the parent's delegation brief). It does **not** automatically see the parent's 40 previous turns, the user's earlier offhand remarks, or files the parent read ten minutes ago.
 
-> **Beginner trap:** Engineers often assume a subagent "knows what we were just talking about." Unless your harness explicitly supports **context forking** (cloning the parent's message history into the child—which is expensive and defeats isolation when you want a clean slate), the child knows **only what you put in the brief**.
+> **Beginner trap:** Engineers often assume a subagent "knows what we were just talking about." Unless your harness explicitly supports **context forking** (cloning the parent's message history into the child, which is expensive and defeats isolation when you want a clean slate), the child knows **only what you put in the brief**.
 
 #### Anatomy of a Crisp Delegation Brief
 
@@ -138,7 +138,7 @@ Here is what a concrete tool call from the parent LLM to spawn a subagent looks 
 
 #### Designing the Return Contract (Preventing "Lying by Omission")
 
-Because the parent never saw the 15 files the child read, the child's final message is the parent's **only window into reality**. If the child returns vague prose like *"I checked the webhooks and there might be a race condition somewhere in the handler"*, the parent has to re-read the files itself—wasting the entire delegation.
+Because the parent never saw the 15 files the child read, the child's final message is the parent's **only window into reality**. If the child returns vague prose like *"I checked the webhooks and there might be a race condition somewhere in the handler"*, the parent has to re-read the files itself: wasting the entire delegation.
 
 Good subagent system prompts enforce **evidence-backed compression**:
 - Always cite exact `path:line_start-line_end` references for every claim.
@@ -212,13 +212,20 @@ Always expose an explicit `model` tier parameter (e.g., `"inherit"`, `"fast"`, `
 
 What happens if a subagent is allowed to spawn its *own* subagents?
 
-```text
-Parent (depth=0)
-  ├─ spawns Subagent A (depth=1)
-  │    ├─ spawns Subagent A1 (depth=2)
-  │    └─ spawns Subagent A2 (depth=2)
-  └─ spawns Subagent B (depth=1)
-       └─ spawns Subagent B1 (depth=2) -> tries to spawn B1a (depth=3) -> BLOCKED!
+```mermaid
+flowchart TD
+    P["Parent (depth=0)"]
+    A["Subagent A (depth=1)"]
+    B["Subagent B (depth=1)"]
+    A1["Subagent A1 (depth=2)"]
+    A2["Subagent A2 (depth=2)"]
+    B1["Subagent B1 (depth=2)"]
+    B1a["Subagent B1a (depth=3) — BLOCKED!"]
+
+    P -->|"spawns"| A & B
+    A -->|"spawns"| A1 & A2
+    B -->|"spawns"| B1
+    B1 -.->|"tries to spawn"| B1a
 ```
 
 Without hard limits, a confused agent can create a **subagent fork bomb**: Parent spawns 3 helpers, each helper breaks the task down and spawns 3 more helpers, and within 30 seconds you have 121 concurrent LLM loops burning \$50/minute!
@@ -245,7 +252,7 @@ Use this practical decision table to guide both your harness design and your orc
 | Reading 1–3 specific files you already know the path to | **Do directly in parent** | Faster (1 parallel tool turn), zero cold-start overhead, lossless context. |
 | Broad search across an unfamiliar repo ("How does auth work across all services?") | **Spawn Read-Only Researcher** | Keeps 30k–80k tokens of dead-end searches out of the parent context; cheap fast model excels here. |
 | Running a huge noisy test suite or triaging 5,000 lines of build logs | **Spawn Verifier / Triage subagent** | Absorbs verbose output in a throwaway context and returns exact failing tests + stack traces. |
-| Independent work across 3+ unrelated modules at once | **Spawn parallel subagents** (with workspace isolation if editing — Ch. 27) | Cuts wall-clock time dramatically via parallel execution. |
+| Independent work across 3+ unrelated modules at once | **Spawn parallel subagents** (with workspace isolation if editing: Ch. 27) | Cuts wall-clock time dramatically via parallel execution. |
 | Tightly coupled 5-line edit in the file the parent just read | **Do directly in parent** | Writing the delegation brief would take more tokens than just applying the patch! |
 | Independent code review / adversarial bug hunt on code the parent just wrote | **Spawn fresh Verifier subagent** | Fresh context removes confirmation bias; read-only toolset guarantees honest review. |
 | Multi-step UI interaction in a live browser | **Spawn Browser Operator** | Keeps bulky DOM snapshots, accessibility trees, and screenshots isolated from coding context. |
@@ -256,20 +263,20 @@ Use this practical decision table to guide both your harness design and your orc
 
 Subagent delegation has rapidly converged into a standard pattern across every major 2025–2026 coding harness:
 
-- **Anthropic's Multi-Agent Research System & Claude Code:** Anthropic popularized the modern **Orchestrator-Worker** subagent architecture. In Claude Code, the native `Agent` / `Task` tool forks an isolated context window for a subtask and returns a condensed summary. Claude Code ships built-in specialized profiles—such as **Explore** (a read-only researcher often routed to fast Haiku-class models for rapid `grep`/`glob` sweeps), **Plan** (context gathering for architectural planning), and **General-Purpose**—alongside user-defined custom agents in `.claude/agents/*.md` with YAML frontmatter controlling `model`, `tools`, and `disallowedTools`. It enforces concurrency and nesting caps via settings like `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` and `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`. In Anthropic's published BrowseComp research, they also documented why multi-agent scaling works: total token budget, parallel tool calls, and model selection explain the vast majority of performance gains—and subagents unlock large token budgets without blowing past single-window context rot.
+- **Anthropic's Multi-Agent Research System & Claude Code:** Anthropic popularized the modern **Orchestrator-Worker** subagent architecture. In Claude Code, the native `Agent` / `Task` tool forks an isolated context window for a subtask and returns a condensed summary. Claude Code ships built-in specialized profiles (such as **Explore** (a read-only researcher often routed to fast Haiku-class models for rapid `grep`/`glob` sweeps), **Plan** (context gathering for architectural planning), and **General-Purpose**) alongside user-defined custom agents in `.claude/agents/*.md` with YAML frontmatter controlling `model`, `tools`, and `disallowedTools`. It enforces concurrency and nesting caps via settings like `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` and `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`. In Anthropic's published BrowseComp research, they also documented why multi-agent scaling works: total token budget, parallel tool calls, and model selection explain the vast majority of performance gains, and subagents unlock large token budgets without blowing past single-window context rot.
 - **OpenAI Codex CLI & Agents SDK:** Codex supports specialized multi-agent delegation paired with strict sandbox tiers (`read-only` vs. `workspace-write`) so research or review subagents cannot modify files, while implementation subagents can be isolated into dedicated Git worktrees (which we cover in Chapter 27).
-- **Gemini CLI & OpenCode:** Both ecosystems support role-based agent profiles with per-profile model routing and tool allowlists—allowing a frontier model to act as the main planner/editor while lightweight helper profiles handle repository exploration, documentation lookups, or scoped verification tasks.
+- **Gemini CLI & OpenCode:** Both ecosystems support role-based agent profiles with per-profile model routing and tool allowlists, allowing a frontier model to act as the main planner/editor while lightweight helper profiles handle repository exploration, documentation lookups, or scoped verification tasks.
 
 ---
 
 ## 6. Common Pitfalls & Failure Modes
 
 1. **The Subagent Fork Bomb:** Allowing every subagent to spawn unlimited nested subagents. A single ambiguous prompt can multiply into dozens of runaway agents hitting rate limits and draining API budgets. **Fix:** Default `max_depth = 1`, strip the spawn tool at `depth == max_depth`, and enforce a tree-wide concurrency semaphore and token/dollar cap.
-2. **The Lazy / Vague Brief ("Go fix the auth bug"):** Because the child starts with an empty context window, a vague prompt forces the child to re-discover everything the parent already knew—or worse, guess wrong and edit the wrong file. **Fix:** Require self-contained briefs with goal, known paths, constraints, and an explicit output contract.
+2. **The Lazy / Vague Brief ("Go fix the auth bug"):** Because the child starts with an empty context window, a vague prompt forces the child to re-discover everything the parent already knew, or worse, guess wrong and edit the wrong file. **Fix:** Require self-contained briefs with goal, known paths, constraints, and an explicit output contract.
 3. **The Telephone Game (Lossy Summaries):** A researcher subagent reads 12 files and replies *"Looks like the database connection pool might be misconfigured."* The parent now has to re-read those exact same files to find *which* file and *which* setting! **Fix:** Instruct subagents to return verbatim `path:line` citations, symbol names, and raw error excerpts.
 4. **Over-Delegating Trivial Work (The Cold-Start Tax):** Spawning a subagent just to read `package.json` adds a brand-new LLM call, a cold system-prompt prefill, and round-trip latency for something the parent could read in 10 milliseconds. **Fix:** Explicitly instruct the parent in its system prompt: *"Prefer direct tool calls for quick, targeted lookups; delegate only for broad exploration, noisy tasks, specialization, or parallelizable work."*
 5. **Prompt-Only Restrictions Instead of Tool Scoping:** Telling a subagent *"You are a read-only reviewer, please do not modify files"* while leaving `edit_file` and `run_command` in its tool schema. One indirect prompt injection inside a repo README can trick the model into calling `run_command`. **Fix:** Enforce tool allowlists/denylists in harness code at both schema generation and tool dispatch.
-6. **Parallel Editor Collisions:** Spawning two `code_editor` subagents simultaneously against the **same working directory**! Subagent A edits `utils.py` while Subagent B runs `git checkout` or overwrites `utils.py`, corrupting both tasks. **Fix:** Only read-only subagents should share a live working directory concurrently; parallel writers **must** get isolated workspaces—which is the exact topic of **Chapter 27**!
+6. **Parallel Editor Collisions:** Spawning two `code_editor` subagents simultaneously against the **same working directory**! Subagent A edits `utils.py` while Subagent B runs `git checkout` or overwrites `utils.py`, corrupting both tasks. **Fix:** Only read-only subagents should share a live working directory concurrently; parallel writers **must** get isolated workspaces, which is the exact topic of **Chapter 27**!
 
 ---
 
@@ -485,7 +492,7 @@ No. Prose instructions inside a prompt can be overridden by indirect prompt inje
 **3. When is it *better* to skip spawning a subagent and do the work directly inside the parent agent?**
 <details>
 <summary>Show Answer</summary>
-When the work is small, targeted, and tightly coupled to the parent's current context—for example, reading 1–3 known files or making a quick edit in code the parent already loaded. Spawning a subagent incurs a cold-start prompt cost, latency overhead, and brief-writing/summarization overhead that outweigh any context savings on tiny tasks.
+When the work is small, targeted, and tightly coupled to the parent's current context, for example, reading 1–3 known files or making a quick edit in code the parent already loaded. Spawning a subagent incurs a cold-start prompt cost, latency overhead, and brief-writing/summarization overhead that outweigh any context savings on tiny tasks.
 </details>
 
 **4. Why should a harness remove `invoke_subagent` from a child's tool schema when `depth == max_depth`, rather than merely returning an error if the child calls it?**

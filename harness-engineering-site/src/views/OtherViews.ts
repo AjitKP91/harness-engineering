@@ -76,7 +76,7 @@ export function renderLabsView(root: HTMLElement, manifest: ManifestData): () =>
             Interactive Harness Labs
           </h1>
           <p class="hero-subtitle" style="margin-bottom:0;">
-            Experiment hands-on with core agent mechanics—every simulator below is also embedded directly inside its matching chapter.
+            Experiment hands-on with core agent mechanics: every simulator below is also embedded directly inside its matching chapter.
           </p>
         </div>
         <a class="btn-secondary" href="#/">← Back to Home</a>

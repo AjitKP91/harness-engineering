@@ -4,7 +4,7 @@
 
 # 31. Programmatic Agent Workflows
 
-So far in Module 5, we have mostly let an **LLM decide what happens next**—spawning subagents, claiming tasks from a shared board, or stepping through a checklist. That open-ended autonomy is magical when you do not know the path ahead.
+So far in Module 5, we have mostly let an **LLM decide what happens next**: spawning subagents, claiming tasks from a shared board, or stepping through a checklist. That open-ended autonomy is magical when you do not know the path ahead.
 
 Now flip the picture around. Suppose you need to:
 - Migrate **60 React class components** to functional hooks and verify every single one compiles and passes tests.
@@ -13,7 +13,7 @@ Now flip the picture around. Suppose you need to:
 
 If you hand 60 files to a single free-form agent loop and say *"Please migrate all 60 one by one,"* it will forget file #34, lose patience around file #41, run out of context around file #48, and produce slightly different output formats for every file.
 
-In cases like these, the answer is **not** a smarter prompt or a bigger swarm—it is **Programmatic Agent Workflows**: using ordinary, rock-solid **deterministic code** (Python, TypeScript, or a workflow engine) to drive the loops, branching, parallelism, and retries, while calling **targeted LLM agents** only for the judgment steps in between.
+In cases like these, the answer is **not** a smarter prompt or a bigger swarm: it is **Programmatic Agent Workflows**: using ordinary, rock-solid **deterministic code** (Python, TypeScript, or a workflow engine) to drive the loops, branching, parallelism, and retries, while calling **targeted LLM agents** only for the judgment steps in between.
 
 ---
 
@@ -24,7 +24,7 @@ Think about how a modern car factory works.
 Does the factory hire one genius mechanic and say, *"Walk around this warehouse, find 60 car frames, figure out what order to paint and wire them, and try not to forget any bolts"*? Of course not!
 
 Instead, the factory uses a **deterministic conveyor belt** (programmatic code) paired with **skilled specialists** (LLM agents) stationed at exact points along the line:
-- The conveyor belt guarantees that **every single car** passes through Station 1 (Scan), Station 2 (Design/Fit), Station 3 (Build), Station 4 (Automated Laser Inspection), and Station 5 (Final Assembly)—in the exact right order, with zero skipped units.
+- The conveyor belt guarantees that **every single car** passes through Station 1 (Scan), Station 2 (Design/Fit), Station 3 (Build), Station 4 (Automated Laser Inspection), and Station 5 (Final Assembly), in the exact right order, with zero skipped units.
 - Deterministic machines handle deterministic work (laser measurements, torque wrenches, stamping metal).
 - Specialists step in only where **judgment and nuance** are required (custom wiring edge cases, diagnosing an unusual vibration, writing a clear inspection report).
 
@@ -49,7 +49,7 @@ Moving the orchestration skeleton into programmatic code delivers five massive p
 
 ## 3. The Big Picture
 
-Here is a canonical **Staged Fan-Out / Fan-In Programmatic Workflow**—combining deterministic discovery, bounded parallel agent workers, deterministic verification, and structured aggregation:
+Here is a canonical **Staged Fan-Out / Fan-In Programmatic Workflow**: combining deterministic discovery, bounded parallel agent workers, deterministic verification, and structured aggregation:
 
 ```mermaid
 flowchart LR
@@ -87,7 +87,7 @@ In its widely cited engineering guide *"Building Effective Agents"*, Anthropic d
 - **Workflows:** Systems where LLMs and tools are orchestrated through **predefined code paths**. You write the `if/else`, loops, and parallelism; the LLM fills in the semantic reasoning inside individual nodes.
 - **Agents:** Systems where the **LLM dynamically directs its own control flow and tool usage** in an open-ended loop based on intermediate observations.
 
-In real harnesses, this is not an all-or-nothing choice—it is a **spectrum** where you pick the lowest level of autonomy that solves the job reliably:
+In real harnesses, this is not an all-or-nothing choice: it is a **spectrum** where you pick the lowest level of autonomy that solves the job reliably:
 
 | Level | Control Flow Owned By | Example | Reliability & Cost Predictability | Best When... |
 | :--- | :--- | :--- | :--- | :--- |
@@ -129,22 +129,22 @@ Three real-world coding-harness shapes where Fan-Out / Fan-In dominates:
 
 Unlike an unbounded chat loop where 40 turns of mixed exploration, half-baked ideas, and compiler errors accumulate in one giant prompt, a **Staged Pipeline** breaks a complex job into clean phases separated by **typed handoff objects** (and fresh contexts):
 
-```text
-Stage 1: Research      -> outputs: ResearchBrief (relevant_files, symbols, constraints)
-Stage 2: Design        -> inputs: ResearchBrief
-                          outputs: ChangePlan (file_edits[], risk_notes, test_plan)
-Stage 3: Implement     -> inputs: ChangePlan
-                          outputs: PatchResult (modified_files[], diff_summary)
-Stage 4: Verify        -> inputs: PatchResult (deterministic pytest + mypy + ruff)
-                          outputs: VerifyReport (passed: bool, errors[])
-                          [if not passed and attempts < 3 -> loop back to Stage 3 with errors]
-Stage 5: Aggregate     -> inputs: ChangePlan + PatchResult + VerifyReport
-                          outputs: FinalPRSummary
+```mermaid
+flowchart TD
+    S1["Stage 1: Research\noutputs: ResearchBrief (relevant_files, symbols, constraints)"]
+    S2["Stage 2: Design\ninputs: ResearchBrief -> outputs: ChangePlan (file_edits[], risk_notes, test_plan)"]
+    S3["Stage 3: Implement\ninputs: ChangePlan -> outputs: PatchResult (modified_files[], diff_summary)"]
+    S4["Stage 4: Verify (deterministic pytest + mypy + ruff)\noutputs: VerifyReport (passed: bool, errors[])"]
+    S5["Stage 5: Aggregate\ninputs: ChangePlan + PatchResult + VerifyReport -> FinalPRSummary"]
+
+    S1 --> S2 --> S3 --> S4
+    S4 -->|"not passed & retries under 3 (loop with errors)"| S3
+    S4 -->|"passed"| S5
 ```
 
 Notice two critical design details:
 - **Context hygiene by construction:** Stage 3 (Implement) never has to read the 18 dead-end files that Stage 1 (Research) rejected. It receives only the distilled `ChangePlan`.
-- **Bounded self-correction loops:** Stage 3 ↔ Stage 4 is an **Evaluator–Optimizer loop** wrapped in deterministic code (`for attempt in range(1, max_attempts + 1):`). If the compiler or test suite passes on attempt 1, you finish immediately. If it fails, you feed the exact error trace back into Stage 3—and if it still fails after 3 tries, the loop terminates cleanly instead of burning \$20 in an infinite doom loop.
+- **Bounded self-correction loops:** Stage 3 ↔ Stage 4 is an **Evaluator–Optimizer loop** wrapped in deterministic code (`for attempt in range(1, max_attempts + 1):`). If the compiler or test suite passes on attempt 1, you finish immediately. If it fails, you feed the exact error trace back into Stage 3, and if it still fails after 3 tries, the loop terminates cleanly instead of burning \$20 in an infinite doom loop.
 
 ---
 
@@ -152,13 +152,15 @@ Notice two critical design details:
 
 Beginners often make an agent use expensive LLM reasoning for jobs that a 5-millisecond CLI tool does with 100% accuracy. Experienced harness engineers use the **Deterministic Sandwich Pattern**:
 
-```text
-[Deterministic Pre-Work]  -->  [Tiny, High-Leverage LLM Call]  -->  [Deterministic Post-Work]
-  (ripgrep, AST, git diff,        (semantic judgment, patch           (formatter, type-checker,
-   pytest collection)              synthesis, explanation)             unit tests, schema check)
+```mermaid
+flowchart LR
+    Pre["Deterministic Pre-Work\n(ripgrep, AST, git diff, pytest collection)"]
+    LLM["Tiny, High-Leverage LLM Call\n(semantic judgment, patch synthesis, explanation)"]
+    Post["Deterministic Post-Work\n(formatter, type-checker, unit tests, schema check)"]
+    Pre --> LLM --> Post
 ```
 
-Let's compare token cost and accuracy on a real task—**"Find all deprecated `fetchUser()` calls across a 500-file repo and migrate them to `getUserProfile()`"**:
+Let's compare token cost and accuracy on a real task: **"Find all deprecated `fetchUser()` calls across a 500-file repo and migrate them to `getUserProfile()`"**:
 
 | Step | Naive All-LLM Approach | Deterministic Sandwich Approach |
 | :--- | :--- | :--- |
@@ -179,12 +181,12 @@ Moving from a toy Python script to a production workflow engine requires getting
 Launching `asyncio.gather(*[run_agent(f) for f in 100_files])` with no limit will instantly trigger provider `429 Rate Limit Exceeded` errors, blow out local CPU/RAM if every worker runs `pytest`, and spike tail latency.
 
 Always wrap fan-out calls with:
-- A **concurrency semaphore** (`asyncio.Semaphore(max_workers)`—typically 4–10 for LLM calls, or 2–4 if each worker runs heavy builds/tests).
+- A **concurrency semaphore** (`asyncio.Semaphore(max_workers)`, typically 4–10 for LLM calls, or 2–4 if each worker runs heavy builds/tests).
 - A **per-item timeout** (`asyncio.wait_for(..., timeout=120)`) so one hung worker never freezes the whole fan-in barrier.
 - **Staggered backoff with jitter** inside the LLM client (Chapter 05 & 39).
 
 #### 2. Structured Return Contracts
-Never let a worker in a programmatic workflow return unstructured English like *"I think there might be a small SQL issue on line 40, also looks mostly okay!"*—your downstream Python code cannot reliably branch on vibes.
+Never let a worker in a programmatic workflow return unstructured English like *"I think there might be a small SQL issue on line 40, also looks mostly okay!"*: your downstream Python code cannot reliably branch on vibes.
 
 Enforce a **typed return contract** using Structured Outputs (`strict: true`, Chapter 03) validated by Pydantic or Zod:
 
@@ -223,10 +225,10 @@ Production fan-in pipelines treat every worker output as a **Result envelope** (
 ## 5. How Real Harnesses Do It
 
 - **Anthropic's *"Building Effective Agents"* Patterns:** Codified the five foundational programmatic workflow topologies used across modern harnesses: **Prompt Chaining**, **Routing**, **Parallelization (Sectioning & Voting)**, **Orchestrator–Workers**, and **Evaluator–Optimizer**.
-- **LangGraph (Cyclic State Graphs):** Models workflows as typed state machines where nodes are Python/TypeScript functions (deterministic or LLM-powered) and edges route conditionally—making cyclic loops like `implement → test → fix → test` clean, inspectable, and checkpointable at every node boundary.
+- **LangGraph (Cyclic State Graphs):** Models workflows as typed state machines where nodes are Python/TypeScript functions (deterministic or LLM-powered) and edges route conditionally, making cyclic loops like `implement → test → fix → test` clean, inspectable, and checkpointable at every node boundary.
 - **Temporal (Durable Execution for Long-Running Workflows):** Used when agent workflows must survive server crashes, container restarts, or multi-day human approvals. Temporal records every completed LLM call and tool result as a durable event history; if the worker process dies at step 47 of 60, Temporal replays steps 1–46 from history (zero duplicate LLM spend!) and resumes cleanly at step 47.
-- **PydanticAI (Type-Safe Code-First Workflows):** Combines standard Python control flow (`async/await`, `for`, `if`) with strict Pydantic output validation, dependency injection, and native integration with durable engines like Temporal—letting engineers write workflows that look like normal, testable Python rather than custom DSLs.
-- **Harness-Native Workflow Runners (e.g., Antigravity's `run_workflow`):** Expose lightweight Python orchestration primitives (`agent`, `parallel`, `pipeline`, `phase`, `call_tool`) directly inside the coding agent harness itself—so an agent can write and execute a 40-line Python script on the fly to fan out over 50 files, validate structured results, and aggregate them without bloating its own conversation context.
+- **PydanticAI (Type-Safe Code-First Workflows):** Combines standard Python control flow (`async/await`, `for`, `if`) with strict Pydantic output validation, dependency injection, and native integration with durable engines like Temporal; letting engineers write workflows that look like normal, testable Python rather than custom DSLs.
+- **Harness-Native Workflow Runners (e.g., Antigravity's `run_workflow`):** Expose lightweight Python orchestration primitives (`agent`, `parallel`, `pipeline`, `phase`, `call_tool`) directly inside the coding agent harness itself, so an agent can write and execute a 40-line Python script on the fly to fan out over 50 files, validate structured results, and aggregate them without bloating its own conversation context.
 
 ---
 
@@ -243,7 +245,7 @@ Production fan-in pipelines treat every worker output as a **Result envelope** (
    - *Fix:* Enforce JSON Schema / Pydantic structured return contracts at every stage boundary.
 4. **Over-Engineering Open-Ended Tasks into Rigid Pipelines:**
    - *Symptom:* Building a 7-stage hardcoded workflow for debugging a mysterious production outage, where the real root cause doesn't fit any predefined branch.
-   - *Fix:* Match the architecture to the problem—use programmatic workflows when the macro structure is known, and embed open-ended mini-agents (or use a single interactive agent) when the exploration path is genuinely unknown.
+   - *Fix:* Match the architecture to the problem; use programmatic workflows when the macro structure is known, and embed open-ended mini-agents (or use a single interactive agent) when the exploration path is genuinely unknown.
 5. **Unbounded Retry Loops Inside Verify Stages:**
    - *Symptom:* `while not tests_pass:` loops 40 times on an impossible environment error (e.g., missing system binary), burning the entire token budget.
    - *Fix:* Enforce a small `max_attempts` cap (typically 2–3), distinguish infrastructure errors from code errors, and abort early if the exact same error repeats twice in a row.
@@ -430,14 +432,14 @@ if __name__ == "__main__":
 Look at what happens when you run this workflow:
 - `src/clean.py` never touches an LLM (zero wasted tokens).
 - `src/needs_retry.py` fails deterministic verification on attempt 1, feeds the exact `SyntaxError` back into attempt 2, and succeeds automatically.
-- `src/flaky_timeout.py` times out cleanly and `src/unfixable.py` catches its 503 error—**without** losing the 3 succeeded files, which are already safely checkpointed to disk!
+- `src/flaky_timeout.py` times out cleanly and `src/unfixable.py` catches its 503 error, **without** losing the 3 succeeded files, which are already safely checkpointed to disk!
 
 ---
 
 ## 8. Key Takeaways & Quick Self-Check
 
 - **Code for control flow, LLMs for judgment:** Whenever the macro sequence of steps is known upfront, write deterministic code for loops, branching, parallelism, and retries instead of asking an LLM to juggle 50 items in one chat window.
-- **Use Fan-Out / Fan-In for breadth and consistency:** Split targets deterministically, map each item through a focused isolated agent, and reduce structured outputs—preventing context bloat and skipped items.
+- **Use Fan-Out / Fan-In for breadth and consistency:** Split targets deterministically, map each item through a focused isolated agent, and reduce structured outputs, preventing context bloat and skipped items.
 - **Build Deterministic Sandwiches:** Pre-filter inputs with fast CLI/AST tools and post-verify outputs with real compilers, linters, and test runners inside bounded retry loops.
 - **Engineer for partial failure:** Always bound concurrency with semaphores, enforce per-item timeouts, validate structured return contracts, wrap results in `ok/error` envelopes, and checkpoint completed items so crashes never waste finished work.
 - **Know when to stay autonomous:** Use programmatic workflows when the shape of the work is predictable; keep open-ended autonomous agent loops (or hybrid workflows with mini-agent nodes) for genuinely exploratory debugging and design.
@@ -446,12 +448,12 @@ Look at what happens when you run this workflow:
 
 1. **In Anthropic's *"Building Effective Agents"* taxonomy, what is the core difference between a *Workflow* and an *Agent*?**
    <details><summary>Show Answer</summary>
-   In a **Workflow**, predefined code controls the sequence of LLM calls, branches, loops, and tool invocations—the LLM only fills in semantic steps. In an **Agent**, the LLM itself dynamically decides which tools to call and what steps to take next based on observations from its environment.
+   In a **Workflow**, predefined code controls the sequence of LLM calls, branches, loops, and tool invocations: the LLM only fills in semantic steps. In an **Agent**, the LLM itself dynamically decides which tools to call and what steps to take next based on observations from its environment.
    </details>
 
 2. **Why is running 4 focused parallel review lenses (security, performance, correctness, API compatibility) over a PR often better than one comprehensive prompt asking an agent to "review everything"?**
    <details><summary>Show Answer</summary>
-   A single "review everything" prompt splits the model's attention across competing concerns, leading to shallow or missed findings. Four parallel lenses run in isolated contexts with sharp, non-overlapping rubrics and structured return schemas—making each lens deeper while a deterministic fan-in reducer merges and deduplicates the results.
+   A single "review everything" prompt splits the model's attention across competing concerns, leading to shallow or missed findings. Four parallel lenses run in isolated contexts with sharp, non-overlapping rubrics and structured return schemas, making each lens deeper while a deterministic fan-in reducer merges and deduplicates the results.
    </details>
 
 3. **What goes wrong if you run `await asyncio.gather(*[worker(f) for f in 50_files])` without a semaphore and without `return_exceptions=True` (or per-worker error envelopes)?**
@@ -461,7 +463,7 @@ Look at what happens when you run this workflow:
 
 4. **Why do production teams sometimes pair a type-safe agent library like PydanticAI with a durable execution engine like Temporal?**
    <details><summary>Show Answer</summary>
-   They solve complementary layers: PydanticAI enforces strict runtime schema validation and clean Python ergonomics for each individual LLM call or mini-agent, while Temporal guarantees infrastructure durability—replaying event history after a server crash or a multi-day human approval pause without re-running already-paid LLM calls or repeating side effects.
+   They solve complementary layers: PydanticAI enforces strict runtime schema validation and clean Python ergonomics for each individual LLM call or mini-agent, while Temporal guarantees infrastructure durability; replaying event history after a server crash or a multi-day human approval pause without re-running already-paid LLM calls or repeating side effects.
    </details>
 
 ---

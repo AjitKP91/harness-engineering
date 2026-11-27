@@ -4,14 +4,14 @@
 
 # 38. Telemetry, Tracing & Token/Cost Accounting
 
-In Chapter 37, we built the session's local black box (`.jsonl` transcripts) so you can debug a single run. Now zoom out: imagine your agent harness is running across 200 engineers—or 5,000 CI pull-request jobs a day.
+In Chapter 37, we built the session's local black box (`.jsonl` transcripts) so you can debug a single run. Now zoom out: imagine your agent harness is running across 200 engineers, or 5,000 CI pull-request jobs a day.
 
 Suddenly, someone asks:
 - *"Why did our average task latency jump from 28 seconds to 65 seconds after Tuesday's release?"*
-- *"Our API bill tripled overnight—which repo, model, or tool loop burned \$4,200?"*
+- *"Our API bill tripled overnight, which repo, model, or tool loop burned \$4,200?"*
 - *"Did our prompt caching refactor actually increase cache hits, or did a hidden bug break prefix stability?"*
 
-You cannot answer those questions by reading individual `.jsonl` files one by one. You need **Telemetry, Distributed Tracing, and Exact Token/Cost Accounting**—plus **hard budget kill switches** that stop a runaway agent loop before it drains your monthly API quota at 3 a.m.
+You cannot answer those questions by reading individual `.jsonl` files one by one. You need **Telemetry, Distributed Tracing, and Exact Token/Cost Accounting**: plus **hard budget kill switches** that stop a runaway agent loop before it drains your monthly API quota at 3 a.m.
 
 ---
 
@@ -20,12 +20,12 @@ You cannot answer those questions by reading individual `.jsonl` files one by on
 Think of running a busy commercial restaurant kitchen (scaled up to a chain of 50 restaurants):
 
 - A **transcript** *(Ch. 37)* is the security camera footage of one specific dinner order. Great for investigating a complaint.
-- **Distributed Tracing** is a **color-coded stopwatch timeline** showing that Order #482 took 18 minutes total: 2 min taking the order, 11 min waiting on the grill, 3 min plating, and 2 min waiting on a runner. Instantly, you see the bottleneck is the grill—not the waiter.
+- **Distributed Tracing** is a **color-coded stopwatch timeline** showing that Order #482 took 18 minutes total: 2 min taking the order, 11 min waiting on the grill, 3 min plating, and 2 min waiting on a runner. Instantly, you see the bottleneck is the grill, not the waiter.
 - **Cost Accounting & Budgets** is the **cash register + circuit breaker** that knows saffron costs 50x more per gram than salt, calculates the exact profit margin of every plate, and automatically shuts off the gas valve if a faulty stove tries to burn \$500 of fuel on a single soup.
 
 **What breaks if you don't have it?**
 1. **Invisible cache regressions:** A tiny bug (like putting a timestamp in the system prompt, *Ch. 08*) silently drops your prompt cache hit rate from 90% to 0%, multiplying your monthly bill by 5x–10x without throwing a single error!
-2. **Wrong cost math:** Treating all input tokens as full price—or forgetting that **reasoning/thinking tokens** are billed at expensive output rates—makes your reported spend wildly inaccurate.
+2. **Wrong cost math:** Treating all input tokens as full price, or forgetting that **reasoning/thinking tokens** are billed at expensive output rates, makes your reported spend wildly inaccurate.
 3. **Runaway overnight spend:** One stuck subagent loop retrying a failing build 400 times in CI can burn hundreds of dollars before anyone wakes up.
 
 ---
@@ -35,38 +35,43 @@ Think of running a busy commercial restaurant kitchen (scaled up to a chain of 5
 Observability turns harness engineering from guesswork into an **exact science**:
 
 - **Pinpoint real bottlenecks:** Without span timelines, teams routinely blame "slow LLMs" when 70% of wall-clock time is actually spent waiting on an unindexed `grep`, a cold LSP startup, or a slow Docker container boot.
-- **Verify optimizations with hard numbers:** When you ship micro-compaction *(Ch. 10)* or deferred tool loading *(Ch. 12)*, metrics immediately prove whether **tokens per resolved task** went down—or accidentally went *up* because the model had to re-read files!
+- **Verify optimizations with hard numbers:** When you ship micro-compaction *(Ch. 10)* or deferred tool loading *(Ch. 12)*, metrics immediately prove whether **tokens per resolved task** went down, or accidentally went *up* because the model had to re-read files!
 - **Multi-agent visibility:** When a parent agent spawns 4 parallel subagents *(Ch. 26)* and calls 2 remote MCP servers *(Ch. 19)*, distributed trace IDs stitch the entire tree together into one visual flamegraph.
-- **Enterprise trust & chargeback:** Organizations deploying coding agents need exact cost attribution per user, team, repository, and CI pipeline—and guaranteed spend ceilings.
+- **Enterprise trust & chargeback:** Organizations deploying coding agents need exact cost attribution per user, team, repository, and CI pipeline, and guaranteed spend ceilings.
 
 ---
 
 ## 3. The Big Picture
 
-In **OpenTelemetry (OTel)**—the industry-standard open-source observability framework—one end-to-end user task is a **Trace** (identified by a `trace_id`), broken into nested timed units of work called **Spans** (each with a `span_id` and `parent_span_id`).
+In **OpenTelemetry (OTel)**, the industry-standard open-source observability framework, one end-to-end user task is a **Trace** (identified by a `trace_id`), broken into nested timed units of work called **Spans** (each with a `span_id` and `parent_span_id`).
 
-```text
-Trace: trace_id=7f3a9c...  (Total: 14.8s | Cost: $0.042 | Cache Hit: 86%)
-│
-└── [invoke_agent: "coding-harness"] ................................. 14.8s
-    │
-    ├── [turn: 1] .................................................... 5.1s
-    │   ├── [chat claude-sonnet-4-6] ─────── 2.4s (TTFT: 0.45s, 8.2k in / 7.1k cached / 120 out)
-    │   ├── [execute_tool: ripgrep]  ── 0.3s (ok)
-    │   └── [execute_tool: read_file] ─ 0.1s (ok)
-    │
-    ├── [turn: 2] .................................................... 6.8s
-    │   ├── [chat claude-sonnet-4-6] ───────── 2.9s (TTFT: 0.50s)
-    │   └── [invoke_agent: "test-runner" (subagent)] ─────── 3.8s
-    │       ├── [chat claude-haiku-4-5] ─── 0.9s
-    │       └── [execute_tool: bash]    ─────── 2.7s (pytest: 12 passed)
-    │
-    └── [turn: 3] .................................................... 2.9s
-        ├── [chat claude-sonnet-4-6] ──────── 2.7s (stop_reason: end_turn)
-        └── [budget_check] ────────────────── <1ms (spent $0.042 / $2.00 cap)
+<!-- visual:otel-trace-waterfall -->
+```mermaid
+flowchart TD
+    Root["Trace trace_id=7f3a9c (14.8s | $0.042 | Cache Hit: 86%)\ninvoke_agent: coding-harness"]
+    T1["turn: 1 (5.1s)"]
+    T1A["chat claude-sonnet-4-6 (2.4s · TTFT 0.45s · 8.2k in / 7.1k cached / 120 out)"]
+    T1B["execute_tool: ripgrep (0.3s · ok)"]
+    T1C["execute_tool: read_file (0.1s · ok)"]
+
+    T2["turn: 2 (6.8s)"]
+    T2A["chat claude-sonnet-4-6 (2.9s · TTFT 0.50s)"]
+    T2B["invoke_agent: test-runner subagent (3.8s)"]
+    T2B1["chat claude-haiku-4-5 (0.9s)"]
+    T2B2["execute_tool: bash (2.7s · pytest: 12 passed)"]
+
+    T3["turn: 3 (2.9s)"]
+    T3A["chat claude-sonnet-4-6 (2.7s · stop_reason: end_turn)"]
+    T3B["budget_check (under 1ms · spent $0.042 / $2.00 cap)"]
+
+    Root --> T1 & T2 & T3
+    T1 --> T1A & T1B & T1C
+    T2 --> T2A & T2B
+    T2B --> T2B1 & T2B2
+    T3 --> T3A & T3B
 ```
 
-Notice how one glance reveals everything: Turn 2 took the longest, not because of the main LLM, but because the `bash` test run inside the subagent took 2.7 seconds—and the subagent smartly used a faster, cheaper model.
+Notice how one glance reveals everything: Turn 2 took the longest, not because of the main LLM, but because the `bash` test run inside the subagent took 2.7 seconds, and the subagent smartly used a faster, cheaper model.
 
 ---
 
@@ -86,12 +91,12 @@ If you are new to observability, only four vocabulary words matter:
 #### Designing the 5-Level Agent Span Hierarchy
 Keep your span tree clean and predictable:
 1. **Session / Task Root Span (`invoke_agent`):** Lives for the entire user request. Carries `session.id`, `gen_ai.agent.name`, repo hash, and final outcome (`resolved`, `cancelled`, `budget_exceeded`, `error`).
-2. **Turn Span (`agent.turn`):** Groups one ReAct iteration *(Ch. 01)*—making it easy to spot multi-turn loops.
+2. **Turn Span (`agent.turn`):** Groups one ReAct iteration *(Ch. 01)*: making it easy to spot multi-turn loops.
 3. **LLM Inference Span (`chat <model>`):** Wraps the provider HTTP call, recording exact token counts, finish reason, and time-to-first-token (TTFT).
 4. **Tool Execution Span (`execute_tool <name>`):** Wraps each local tool or MCP call, recording `gen_ai.tool.name`, `gen_ai.tool.call.id`, exit status, and whether it required user approval (separating **human wait time** from actual tool execution time!).
 5. **Subagent Span (`invoke_agent <subagent>`):** A child `invoke_agent` span linked to its parent via `parent_span_id`, so nested work never floats as an orphan trace.
 
-> **Crucial timing detail:** If a tool waits 45 seconds for a human to click **"Approve"**, record approval wait as its own child span (`human.approval_wait`)—otherwise your tool-latency dashboards will look falsely slow!
+> **Crucial timing detail:** If a tool waits 45 seconds for a human to click **"Approve"**, record approval wait as its own child span (`human.approval_wait`); otherwise your tool-latency dashboards will look falsely slow!
 
 ---
 
@@ -116,7 +121,7 @@ Alongside spans, emit aggregated histograms/counters:
 - `gen_ai.client.operation.duration` (Histogram, unit: `s`)
 - `gen_ai.server.time_to_first_token` / client-side `gen_ai.client.operation.time_to_first_chunk` (Histogram, unit: `s`)
 
-> **Privacy rule for OTel:** By default, **do not attach raw prompt text or raw code snippets** (`gen_ai.input.messages` / `gen_ai.output.messages`) to exported telemetry spans unless the user explicitly opts in—and always pass opted-in content through your secret redactor *(Ch. 37)*. Metadata-only traces (durations, token counts, tool names, error codes) give you 95% of operational insight with zero source-code leakage!
+> **Privacy rule for OTel:** By default, **do not attach raw prompt text or raw code snippets** (`gen_ai.input.messages` / `gen_ai.output.messages`) to exported telemetry spans unless the user explicitly opts in, and always pass opted-in content through your secret redactor *(Ch. 37)*. Metadata-only traces (durations, token counts, tool names, error codes) give you 95% of operational insight with zero source-code leakage!
 
 ---
 
@@ -125,7 +130,7 @@ Alongside spans, emit aggregated histograms/counters:
 Avoid "vanity dashboards" packed with useless averages. In a coding-agent harness, **six high-signal metrics** tell you almost everything about user experience, reliability, and efficiency:
 
 1. **TTFT (Time-To-First-Token) & TPOT (Time-Per-Output-Token):**
-   - **TTFT** is how long the user stares at a blank spinner before the first token arrives (dominated by prompt prefill + provider queue time). Track **P50 and P95**—not the mean!
+   - **TTFT** is how long the user stares at a blank spinner before the first token arrives (dominated by prompt prefill + provider queue time). Track **P50 and P95**: not the mean!
    - **TPOT** (or tokens/sec) is streaming smoothness once output begins.
    - *Why it matters:* A 6-second TTFT feels sluggish even if total task time is fine. High TTFT usually signals either a cold prompt cache or oversized context windows *(Ch. 08, 09)*.
 2. **End-to-End Task Latency (split by LLM vs. Tool vs. Human Wait):**
@@ -134,7 +139,7 @@ Avoid "vanity dashboards" packed with useless averages. In a coding-agent harnes
    $$\text{Cache Hit Ratio} = \frac{\text{cache\_read\_input\_tokens}}{\text{total\_input\_tokens}}$$
    - In a healthy multi-turn coding session (5+ turns), this should sit around **75%–95%**. If it suddenly drops below 50%, something is busting your prompt prefix!
 4. **Tool Failure Rate (by Tool Name & Error Class):**
-   - Track failure percentages separately for `edit_file` (e.g., stale-line / search-block mismatch—a sign your edit format or error feedback needs work, *Ch. 14*) vs. `bash` (often expected during TDD when running failing tests first!) vs. `mcp_*` (infrastructure instability).
+   - Track failure percentages separately for `edit_file` (e.g., stale-line / search-block mismatch: a sign your edit format or error feedback needs work, *Ch. 14*) vs. `bash` (often expected during TDD when running failing tests first!) vs. `mcp_*` (infrastructure instability).
 5. **Tokens per Resolved Task (and Cost per Resolved Task):**
    - The ultimate north-star efficiency metric. A cheaper model that takes 18 turns and 400k tokens to fix a bug can easily cost *more* (and feel worse) than a stronger model that fixes it in 4 turns and 60k tokens!
 6. **Loop / Intervention Rate:**
@@ -146,7 +151,7 @@ Avoid "vanity dashboards" packed with useless averages. In a coding-agent harnes
 
 If your cost calculator simply does `input_tokens * input_price + output_tokens * output_price`, your numbers can be off by **300% to 800%**!
 
-Modern LLM APIs bill across **five distinct token buckets**—and providers report them differently!
+Modern LLM APIs bill across **five distinct token buckets**: and providers report them differently!
 
 | Token Bucket | Typical Price Multiplier (vs. Base Input) | Billing Gotcha to Watch Out For |
 | :--- | :--- | :--- |
@@ -157,11 +162,11 @@ Modern LLM APIs bill across **five distinct token buckets**—and providers repo
 | **Reasoning / Thinking Tokens** | Same as **Output Tokens** (`3x`–`5x`) | Even when hidden or summarized in the UI, thinking tokens are billed as output! |
 
 #### The #1 Provider Accounting Bug: Inclusive vs. Exclusive Counts!
-Every harness engineer gets bitten by this once—make sure it isn't you:
+Every harness engineer gets bitten by this once: make sure it isn't you:
 
 - **OpenAI & Gemini APIs (Inclusive):** `prompt_tokens` (or `input_tokens`) **already includes** `cached_tokens`. To compute uncached input tokens, you **must subtract**:
   $$\text{uncached\_in} = \text{input\_tokens} - \text{cache\_read\_tokens}$$
-  Likewise, `completion_tokens` (or `output_tokens`) **already includes** `reasoning_tokens` (though Gemini sometimes reports `thoughtsTokenCount` separately—always check your provider adapter!).
+  Likewise, `completion_tokens` (or `output_tokens`) **already includes** `reasoning_tokens` (though Gemini sometimes reports `thoughtsTokenCount` separately: always check your provider adapter!).
 - **Anthropic Messages API (Exclusive for Input):** `usage.input_tokens` is **only the uncached portion**! Total input tokens is the **sum**:
   $$\text{total\_in} = \text{input\_tokens} + \text{cache\_creation\_input\_tokens} + \text{cache\_read\_input\_tokens}$$
   Forgetting this makes Anthropic's cache hit ratio look impossible (e.g., `cache_read = 18,000` while `input_tokens = 400`, yielding a nonsensical `4500%` hit rate!).
@@ -184,7 +189,7 @@ Suppose a turn calls a model priced at **\$3 / 1M base input**, **\$3.75 / 1M ca
 
 $$\text{Cost} = \frac{1{,}200 \times 3 + 4{,}000 \times 3.75 + 40{,}000 \times 0.30 + (300 + 1{,}700) \times 15}{1{,}000{,}000} = \$0.0606$$
 
-Compare that to naive math without prompt caching: `(45,200 × 3 + 2,000 × 15) / 1M = $0.1656`—nearly **3x higher**! Accurate bucket accounting shows the true economics of your harness.
+Compare that to naive math without prompt caching: `(45,200 × 3 + 2,000 × 15) / 1M = $0.1656`; nearly **3x higher**! Accurate bucket accounting shows the true economics of your harness.
 
 ---
 
@@ -197,7 +202,7 @@ Design your **Budget Enforcer** with **four layers of defense**:
 1. **Multi-Scope Hierarchical Budgets:**
    - **Per-Turn / Per-Call Cap:** Maximum `max_output_tokens` and reasoning budget on a single request.
    - **Per-Session / Per-Task Cap:** e.g., `max_cost_usd = 2.00` (interactive) or `max_cost_usd = 0.50` (CI bot), plus `max_turns = 40`.
-   - **Shared Parent + Subagent Pool:** **Critical!** Subagents must draw from the *parent session's* shared budget ledger—never give each of 10 spawned subagents its own fresh \$5 allowance, or a single task suddenly has a \$55 ceiling!
+   - **Shared Parent + Subagent Pool:** **Critical!** Subagents must draw from the *parent session's* shared budget ledger, never give each of 10 spawned subagents its own fresh \$5 allowance, or a single task suddenly has a \$55 ceiling!
    - **Org / User Rolling Quota:** Daily or monthly spend limit enforced at your API gateway or proxy.
 2. **Pre-Flight Reservation (Before Calling the LLM):**
    Before every LLM API call, estimate the worst-case incremental cost (current prompt tokens + `max_output_tokens`). If `spent + estimated > hard_cap`, stop *before* sending the request.
@@ -214,7 +219,7 @@ Design your **Budget Enforcer** with **four layers of defense**:
 - **Claude Code (Built-in OTel + `/cost` + `--max-budget-usd`):** Ships native OpenTelemetry export (`CLAUDE_CODE_ENABLE_TELEMETRY=1`) emitting metrics and events for token usage (input, output, cache read, cache creation), USD cost, session duration, and active tool calls. Interactive users can inspect live session spend via `/cost`, while headless/CI runs enforce hard spend ceilings with `--max-budget-usd` and `--max-turns`.
 - **Gemini CLI (Native OTel Telemetry):** Includes built-in OpenTelemetry instrumentation exporting traces and metrics to local collectors or Google Cloud Monitoring, tracking model latency, token breakdowns (including cached and thinking tokens), tool call success/failure rates, and session outcomes.
 - **OpenAI Agents SDK & Codex CLI:** Propagate trace contexts automatically across agent handoffs, tool calls, and subagents, recording structured usage payloads (`input_tokens`, `cached_tokens`, `output_tokens`, `reasoning_tokens`) per turn and supporting pluggable OTel/Langfuse/Arize exporters.
-- **LiteLLM Proxy & Enterprise AI Gateways:** Sit between developer harnesses and upstream model providers to enforce centralized per-key/per-team spend caps, track exact model pricing tables in one place, and automatically reject requests with HTTP 400/429 once a budget ceiling is hit—so even a buggy client harness cannot overspend.
+- **LiteLLM Proxy & Enterprise AI Gateways:** Sit between developer harnesses and upstream model providers to enforce centralized per-key/per-team spend caps, track exact model pricing tables in one place, and automatically reject requests with HTTP 400/429 once a budget ceiling is hit, so even a buggy client harness cannot overspend.
 
 ---
 
@@ -227,7 +232,7 @@ Design your **Budget Enforcer** with **four layers of defense**:
    *What happens:* A vendor cuts prices by 50% or introduces a long-context (`> 200k`) surcharge, and your harness reports phantom costs for six months.
    *Fix:* Load pricing tables from a versioned JSON config file (updatable independently of binary releases) and log **raw token buckets** alongside computed USD cost so finance/analytics can always recompute historical spend cleanly.
 3. **Unbounded subagent budgets:**
-   *What happens:* You enforce a \$1.00 cap on the main agent, which spawns 8 subagents that each spend \$0.80—blowing past your cap by 7x.
+   *What happens:* You enforce a \$1.00 cap on the main agent, which spawns 8 subagents that each spend \$0.80; blowing past your cap by 7x.
    *Fix:* Pass a **thread-safe shared `BudgetLedger`** reference down to every subagent and check it atomically before every LLM call.
 4. **Blocking the agent loop on synchronous telemetry HTTP exports:**
    *What happens:* Your OTel collector goes down or has 3-second latency, and suddenly every single tool call in the user's CLI hangs waiting to flush spans!
@@ -457,7 +462,7 @@ Notice how cleanly every piece connects:
 
 3. **Your dashboard shows `execute_tool bash` P95 latency suddenly spiked from 1.2s to 38s, even though the commands themselves didn't get slower. What observability mistake likely caused this?**
    <details><summary>Show Answer</summary>
-   The `execute_tool` span likely started *before* the human-in-the-loop permission prompt appeared—so 36 seconds of a developer reading the approval dialog got bundled into "tool execution latency." Split approval waiting into its own separate span (`human.approval_wait`) so infrastructure latency stays accurate.
+   The `execute_tool` span likely started *before* the human-in-the-loop permission prompt appeared, so 36 seconds of a developer reading the approval dialog got bundled into "tool execution latency." Split approval waiting into its own separate span (`human.approval_wait`) so infrastructure latency stays accurate.
    </details>
 
 4. **Why is a soft budget threshold (e.g., 80%) valuable alongside a hard 100% kill switch?**

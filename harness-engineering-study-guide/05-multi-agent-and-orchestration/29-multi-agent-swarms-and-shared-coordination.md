@@ -14,7 +14,7 @@ Now comes the hardest question in multi-agent harness engineering: **when you pu
 
 Imagine trying to serve dinner to 100 guests.
 
-If you put **one chef** in the kitchen, they have perfect awareness of every plate—nothing conflicts, and every sauce matches every protein—but they can only cook so fast before orders pile up and guests wait two hours.
+If you put **one chef** in the kitchen, they have perfect awareness of every plate (nothing conflicts, and every sauce matches every protein) but they can only cook so fast before orders pile up and guests wait two hours.
 
 Now imagine you throw **six chefs** into the same kitchen with no rules and yell, *"Make dinner!"* What happens?
 - Two chefs both try to cook the same steak.
@@ -29,19 +29,19 @@ Real restaurants solved this over a century ago with the **brigade system** (a s
 
 A **multi-agent swarm** works on the exact same principle. "Swarm" is a catchy word, but in production harness engineering it does **not** mean a free-for-all mob of autonomous bots. It means a **coordinated group of independent agent sessions** linked by explicit roles, ownership boundaries, shared task state, and structured communication.
 
-Without shared coordination, adding more agents does not make your harness smarter—it makes it **faster at creating merge conflicts, contradictory architectures, and giant API bills**.
+Without shared coordination, adding more agents does not make your harness smarter: it makes it **faster at creating merge conflicts, contradictory architectures, and giant API bills**.
 
 ---
 
 ## 2. Why This Matters in a Real Agent Harness
 
-When a single coding agent tackles a massive task—say, auditing 40 microservices, migrating a full-stack app across frontend and backend, or building an entire application over several hours—three limits eventually bite:
+When a single coding agent tackles a massive task (say, auditing 40 microservices, migrating a full-stack app across frontend and backend, or building an entire application over several hours) three limits eventually bite:
 
 1. **Wall-clock latency:** A single agent works serially, one tool call or small parallel batch at a time. Investigating five independent subsystems sequentially takes 5× as long as investigating them concurrently.
 2. **Context pollution and degradation:** Every file read, failed test log, and blind alley piles into one context window. Even with compaction (Chapter 10), trying to hold frontend CSS, database schemas, auth middleware, and end-to-end Playwright logs in one thread degrades reasoning quality.
-3. **The self-evaluation trap:** When the same agent writes code and grades its own work, it suffers from **sunk-cost bias**—remembering how hard it tried, it frequently convinces itself that a broken layout or half-tested endpoint is "good enough."
+3. **The self-evaluation trap:** When the same agent writes code and grades its own work, it suffers from **sunk-cost bias**: remembering how hard it tried, it frequently convinces itself that a broken layout or half-tested endpoint is "good enough."
 
-Well-designed multi-agent coordination directly attacks all three problems—splitting breadth-first work across parallel workers, isolating noisy exploration, and putting a skeptical, fresh-context evaluator between the builder and the user.
+Well-designed multi-agent coordination directly attacks all three problems: splitting breadth-first work across parallel workers, isolating noisy exploration, and putting a skeptical, fresh-context evaluator between the builder and the user.
 
 At the same time, **coordination has a steep tax**. Every extra agent duplicates system prompts, reads overlapping files, and spends tokens communicating. Real harness engineering is knowing *both* how to build rock-solid swarm coordination *and* when to leave the swarm in the toolbox and use a single agent instead.
 
@@ -86,16 +86,18 @@ Notice the separation of concerns:
 
 ### 4.1 Swarm Topologies
 
-A **topology** is simply the "org chart" of your agents—who talks to whom, and in what order work flows. Almost every real-world multi-agent coding harness uses one (or a hybrid) of four core topologies:
+A **topology** is simply the "org chart" of your agents: who talks to whom, and in what order work flows. Almost every real-world multi-agent coding harness uses one (or a hybrid) of four core topologies:
 
 #### 1. Coordinator–Worker (Hub-and-Spoke)
 One **Lead / Coordinator** agent breaks the goal into independent subtasks, dispatches them to parallel **Worker** agents, waits for results, and synthesizes the final answer.
 
-```text
-                [ Coordinator ]
-               /       |       \
-              v        v        v
-        [Worker A] [Worker B] [Worker C]
+```mermaid
+flowchart TD
+    Coord["Coordinator"]
+    WA["Worker A"]
+    WB["Worker B"]
+    WC["Worker C"]
+    Coord --> WA & WB & WC
 ```
 - **Best for:** Breadth-first research, scanning multiple directories, parallel test debugging, or sharded refactoring across independent modules.
 - **Weakness:** The coordinator becomes a bottleneck if workers need frequent back-and-forth with each other.
@@ -103,19 +105,26 @@ One **Lead / Coordinator** agent breaks the goal into independent subtasks, disp
 #### 2. Pipeline / Assembly Line
 Work flows through sequential specialist stages, where each stage starts with a fresh context seeded only by the previous stage's structured artifact.
 
-```text
-[Researcher] --> (spec.md) --> [Architect] --> (plan.md) --> [Builder] --> (diff) --> [Verifier]
+```mermaid
+flowchart LR
+    R["Researcher"] -->|"spec.md"| A["Architect"] -->|"plan.md"| B["Builder"] -->|"diff"| V["Verifier"]
 ```
 - **Best for:** Predictable, multi-phase software workflows where separating exploration from design from coding prevents context clutter.
-- **Weakness:** Strictly sequential—errors discovered at stage 4 require looping back to stage 2 or 3.
+- **Weakness:** Strictly sequential; errors discovered at stage 4 require looping back to stage 2 or 3.
 
 #### 3. Shared Message Board (Peer-to-Peer / Blackboard)
-Agents share a persistent **blackboard** (or message channel + peer mailboxes) and a shared task list. Workers can talk directly to each other—for example, a backend worker posting `"Changed POST /orders response field from total to total_cents"` so the frontend worker adjusts immediately without routing through a central bottleneck.
+Agents share a persistent **blackboard** (or message channel + peer mailboxes) and a shared task list. Workers can talk directly to each other, for example, a backend worker posting `"Changed POST /orders response field from total to total_cents"` so the frontend worker adjusts immediately without routing through a central bottleneck.
 
-```text
-        +------ [ Shared Board & Task Queue ] ------+
-        |                     |                     |
-   [Frontend] <--------> [Backend] <----------> [QA/Docs]
+```mermaid
+flowchart TD
+    Board["Shared Board & Task Queue"]
+    FE["Frontend"]
+    BE["Backend"]
+    QA["QA / Docs"]
+
+    Board <--> FE & BE & QA
+    FE <--> BE
+    BE <--> QA
 ```
 - **Best for:** Cross-layer features, competing-hypothesis debugging (e.g., three investigators testing different root causes and challenging each other's evidence).
 - **Weakness:** Highest risk of chatter, message storms, and duplicated effort if ownership rules are fuzzy.
@@ -123,15 +132,12 @@ Agents share a persistent **blackboard** (or message channel + peer mailboxes) a
 #### 4. Peer Review / Generator–Evaluator (Adversarial Loop)
 Inspired by Generative Adversarial Networks (GANs), one agent (**Generator**) builds the solution while a separate, completely fresh-context agent (**Evaluator**) grades it against strict acceptance criteria using real tools (test suites, type-checkers, or a live browser).
 
-```text
-[Planner] --> (acceptance_contract.json)
-                     |
-                     v
-               [Generator] --(code + handoff)--> [Evaluator]
-                    ^                                 |
-                    +----(FAIL: concrete bug list)----+
-                                                      |
-                                                (PASS)--> [Done]
+```mermaid
+flowchart LR
+    Planner["Planner"] -->|"acceptance_contract.json"| Gen["Generator"]
+    Gen -->|"code + handoff"| Eval["Evaluator"]
+    Eval -->|"FAIL: concrete bug list"| Gen
+    Eval -->|"PASS"| Done(["Done"])
 ```
 - **Best for:** Long-running app builds, UI/UX quality verification, security reviews, and any task where "looks right to the author" is not good enough.
 - **Weakness:** Extra latency and token cost per review cycle; requires a well-calibrated rubric so the evaluator is neither too lenient nor endlessly nitpicking.
@@ -149,16 +155,16 @@ Inspired by Generative Adversarial Networks (GANs), one agent (**Generator**) bu
 
 ### 4.2 Ownership Boundaries (File & Module Sharding)
 
-If two workers edit `src/api/users.ts` at the same time—even in separate Git worktrees—you have not eliminated conflict; you have merely **postponed it to merge time**. Resolving semantic merge conflicts between two agents who made incompatible assumptions is often harder than having one agent write both changes cleanly.
+If two workers edit `src/api/users.ts` at the same time, even in separate Git worktrees, you have not eliminated conflict; you have merely **postponed it to merge time**. Resolving semantic merge conflicts between two agents who made incompatible assumptions is often harder than having one agent write both changes cleanly.
 
 Production swarms prevent collisions through **explicit ownership boundaries** (often called **sharding**, borrowed from databases where data is partitioned into non-overlapping slices):
 
-1. **Define interface contracts *before* fan-out:** Before Worker A builds the React checkout form and Worker B builds the Express checkout endpoint, the coordinator (or a quick design step) locks down the shared contract—for example, `src/types/checkout.ts` or an OpenAPI spec. Neither worker modifies the contract unilaterally; contract changes go through the coordinator or require an explicit peer handshake.
+1. **Define interface contracts *before* fan-out:** Before Worker A builds the React checkout form and Worker B builds the Express checkout endpoint, the coordinator (or a quick design step) locks down the shared contract, for example, `src/types/checkout.ts` or an OpenAPI spec. Neither worker modifies the contract unilaterally; contract changes go through the coordinator or require an explicit peer handshake.
 2. **Assign disjoint file globs:** Every worker's brief specifies the exact directories or files it owns:
    - `worker-ui`: owns `web/src/checkout/**` and `web/tests/checkout/**`
    - `worker-api`: owns `server/src/checkout/**` and `server/tests/checkout/**`
    - Shared files (`package.json`, `schema.prisma`, `src/types/**`): owned **exclusively** by the coordinator or a dedicated integration step.
-3. **Enforce boundaries in the harness, not just the prompt:** Telling an LLM *"please only edit files in `web/`"* works ~90% of the time—until a worker gets frustrated by a backend error and "helpfully" edits `server/routes.ts` anyway. A real harness enforces write scopes deterministically in its `edit_file` / `write_file` tool router (and filesystem sandbox):
+3. **Enforce boundaries in the harness, not just the prompt:** Telling an LLM *"please only edit files in `web/`"* works ~90% of the time, until a worker gets frustrated by a backend error and "helpfully" edits `server/routes.ts` anyway. A real harness enforces write scopes deterministically in its `edit_file` / `write_file` tool router (and filesystem sandbox):
 
 ```python
 from fnmatch import fnmatch
@@ -189,7 +195,7 @@ class OwnershipGuard:
         )
 ```
 
-Notice the error message: it doesn't just crash—it tells the worker *why* the edit was rejected and *what to do instead* (message the coordinator). Good harness boundaries double as steering signals.
+Notice the error message: it doesn't just crash; it tells the worker *why* the edit was rejected and *what to do instead* (message the coordinator). Good harness boundaries double as steering signals.
 
 ---
 
@@ -211,7 +217,7 @@ Workers are only allowed to claim tasks whose status is `pending` **and** whose 
 #### 2. Atomic Claim Semantics (No Double-Booking)
 Suppose Worker A and Worker B both call `list_tasks()`, see that `T2` is `pending`, and both try to start working on `T2` at the exact same millisecond. That is a classic **TOCTOU (Time-of-Check to Time-of-Use) race condition**.
 
-To prevent double-booking, claiming a task must be **atomic**—using either an OS file lock (`fcntl.flock` / `lockfile`), an SQLite `BEGIN IMMEDIATE` transaction, or **Compare-And-Swap (CAS)** optimistic versioning (`UPDATE tasks SET status='in_progress', owner=? WHERE id=? AND status='pending' AND version=?`). Only one worker succeeds; the loser receives `"Task T2 already claimed by worker-api"` and picks the next unblocked task.
+To prevent double-booking, claiming a task must be **atomic**: using either an OS file lock (`fcntl.flock` / `lockfile`), an SQLite `BEGIN IMMEDIATE` transaction, or **Compare-And-Swap (CAS)** optimistic versioning (`UPDATE tasks SET status='in_progress', owner=? WHERE id=? AND status='pending' AND version=?`). Only one worker succeeds; the loser receives `"Task T2 already claimed by worker-api"` and picks the next unblocked task.
 
 #### 3. Leases (Time-Bounded Locks)
 What happens if Worker A claims `T2`, then crashes, hits a rate limit, or gets killed by an out-of-memory error? If the lock lasts forever, `T2` stays stuck in `in_progress` permanently and blocks `T4` forever.
@@ -249,7 +255,7 @@ Distributed systems fail quietly. In a multi-agent swarm, there are four common 
 
 | State | What Is Actually Happening | Correct Harness Action |
 | :--- | :--- | :--- |
-| **Legitimately Waiting** | Worker finished its task, went to sleep on the board, costing zero tokens. | Do nothing—this is healthy! |
+| **Legitimately Waiting** | Worker finished its task, went to sleep on the board, costing zero tokens. | Do nothing: this is healthy! |
 | **Busy on Slow Tool** | Worker is running `cargo build` or a 2-minute E2E test suite. | Keep renewing lease while child process is alive; do not interrupt prematurely. |
 | **Wedged / Thrashing** | Worker has made 10 consecutive tool calls without passing tests, or is looping on the same file edit. | Monitor detects lack of progress, sends a corrective nudge or escalates to Coordinator to reassign/re-scope. |
 | **Deadlock / Mutual Wait** | Worker A posted a question to Worker B; Worker B is asleep waiting for Worker A's branch. | Stall monitor notices *all* agents are idle while `pending` or `in_progress` tasks remain, and wakes the one member who can unstick the queue. |
@@ -277,18 +283,18 @@ This is the single most important strategic lesson in Module 5.
 
 In mid-2025, two landmark engineering write-ups framed the entire industry debate on multi-agent systems:
 
-1. **Anthropic's Multi-Agent Research System** showed that an Orchestrator–Worker setup (Claude Opus as lead, parallel Claude Sonnet workers) outperformed a single Opus agent by **90.2%** on complex, breadth-first research benchmarks—*at the cost of roughly **15× more tokens** than standard chat* (compared to ~4× for a single-agent loop).
+1. **Anthropic's Multi-Agent Research System** showed that an Orchestrator–Worker setup (Claude Opus as lead, parallel Claude Sonnet workers) outperformed a single Opus agent by **90.2%** on complex, breadth-first research benchmarks: *at the cost of roughly **15× more tokens** than standard chat* (compared to ~4× for a single-agent loop).
 2. **Cognition's *"Don't Build Multi-Agents"*** (by Walden Yan, makers of Devin) pushed back hard on parallel-writer coding swarms, identifying two structural failure modes:
    - **Context fragmentation ("Game of Telephone"):** Every time context is summarized across agent boundaries, subtle assumptions are dropped.
    - **Implicit conflicting decisions:** Writing code involves hundreds of tiny implicit decisions (naming conventions, error handling style, helper abstractions, state shape). When two parallel agents write tightly coupled code simultaneously, their implicit decisions clash violently at integration time.
 
-Later follow-ups from both camps converged on a nuanced, practical engineering rule—often called the **Single-Writer / Parallel-Reader Principle**:
+Later follow-ups from both camps converged on a nuanced, practical engineering rule, often called the **Single-Writer / Parallel-Reader Principle**:
 
 - **Parallel readers almost always win:** Breadth-first exploration, searching a huge monorepo, investigating 4 competing bug hypotheses, running specialized read-only code reviews (security, performance, correctness), or evaluating a live build in a fresh context. Here, context isolation is a *feature*, not a bug.
 - **Parallel writers only win when the task is naturally shardable:** Independent microservices, separate frontend/backend behind a pre-agreed API contract, migrating 30 isolated test files, or building self-contained plugins.
 - **A single well-engineered agent wins when the task is tightly coupled:** Refactoring a core data model that touches 12 interconnected files, chasing down one subtle race condition across layers, or iterating quickly on a small feature.
 
-There is also **Amdahl's Law for Agents**: if 30% of your task is inherently sequential (planning, defining shared types, final integration, fixing cross-module test failures), then even with infinite parallel workers, your maximum theoretical speedup is capped at $1 / 0.30 \approx 3.33\times$—while your token cost climbs linearly (or super-linearly) with every worker you add!
+There is also **Amdahl's Law for Agents**: if 30% of your task is inherently sequential (planning, defining shared types, final integration, fixing cross-module test failures), then even with infinite parallel workers, your maximum theoretical speedup is capped at $1 / 0.30 \approx 3.33\times$, while your token cost climbs linearly (or super-linearly) with every worker you add!
 
 #### Decision Matrix: Single Agent vs. Subagents vs. Full Swarm
 
@@ -325,14 +331,14 @@ There is also **Amdahl's Law for Agents**: if 30% of your task is inherently seq
    - *Symptom:* User asks to rename a button; coordinator spawns 5 workers (Architect, Frontend, Backend, QA, Docs) and burns \$4 in tokens.
    - *Fix:* Put explicit effort-scaling rules in the coordinator prompt and enforce hard caps (`max_workers`, `max_total_tokens`) in deterministic harness code.
 4. **Lost Work on Premature Kill:**
-   - *Symptom:* Coordinator declares victory or times out a worker and immediately deletes its worktree—wiping out 15 minutes of uncommitted changes.
+   - *Symptom:* Coordinator declares victory or times out a worker and immediately deletes its worktree; wiping out 15 minutes of uncommitted changes.
    - *Fix:* Enforce a strict **drain → commit → merge → teardown** shutdown sequence; refuse to delete a dirty worktree unless explicitly forced.
 5. **Silent Deadlocks in Dependency Graphs:**
    - *Symptom:* Task A is `blocked_by` Task B, Task B is `blocked_by` Task A (cycle), or a worker crashes while holding a lock with no lease expiry.
    - *Fix:* Validate the DAG for cycles on every `add_task` call (topological sort / cycle check), and enforce time-bounded leases with automatic watchdog reclamation.
 6. **Chatter Storms on Shared Message Boards:**
    - *Symptom:* Four peer agents spend 30 turns politely replying *"Thanks, got it!"* and *"Sounds good!"* to each other, burning budget on acknowledgments.
-   - *Fix:* Instruct peers to message **only** when sharing actionable state changes, contract questions, or blockers—and never send pure acknowledgment replies.
+   - *Fix:* Instruct peers to message **only** when sharing actionable state changes, contract questions, or blockers, and never send pure acknowledgment replies.
 
 ---
 
@@ -524,14 +530,14 @@ if __name__ == "__main__":
     print("Watchdog sweep:", queue.watchdog_sweep())
 ```
 
-Look how little code it takes to eliminate the three nastiest swarm bugs (double-claiming, cyclic deadlocks, and crashed-worker lock leaks) deterministically—without asking an LLM to "remember" who owns what.
+Look how little code it takes to eliminate the three nastiest swarm bugs (double-claiming, cyclic deadlocks, and crashed-worker lock leaks) deterministically, without asking an LLM to "remember" who owns what.
 
 ---
 
 ## 8. Key Takeaways & Quick Self-Check
 
 - **Choose the simplest topology that fits:** Coordinator–Worker for breadth-first fan-out, Pipeline for clean staged handoffs, Shared Board for cross-layer collaboration, and Generator–Evaluator to defeat self-evaluation bias.
-- **Shard writes strictly:** Lock shared contracts *before* parallel workers start, assign disjoint file globs, and enforce write boundaries in harness code—not just prompt prose.
+- **Shard writes strictly:** Lock shared contracts *before* parallel workers start, assign disjoint file globs, and enforce write boundaries in harness code, not just prompt prose.
 - **Keep shared state outside chat:** Use a dependency-aware (DAG), atomically locked task queue with time-bounded leases and disk-backed handoff artifacts.
 - **Detect stalls and shut down gracefully:** Distinguish zero-cost idle workers from wedged or deadlocked ones, and always drain, commit, and merge worktrees before tearing down workers.
 - **Respect swarm economics:** Multi-agent swarms can deliver huge wins on breadth-first or cleanly shardable work, but carry a 3×–15× token multiplier and severe context-fragmentation risks on tightly coupled edits. When in doubt, prefer **single writer + parallel read-only helpers**.
@@ -540,7 +546,7 @@ Look how little code it takes to eliminate the three nastiest swarm bugs (double
 
 1. **Why does Cognition's *"Don't Build Multi-Agents"* critique warn specifically against parallel *writer* agents on tightly coupled code, even if each worker has its own Git worktree?**
    <details><summary>Show Answer</summary>
-   Git worktrees prevent *filesystem* collisions, not *architectural* collisions. Writing code involves dozens of implicit decisions (naming, error handling, helper abstractions, state assumptions). Two parallel writers in isolated contexts make incompatible implicit decisions—creating a "game of telephone" and painful semantic conflicts when their branches are merged. Parallel *readers* (researchers, reviewers) do not suffer from this because a single writer still owns all coherent code mutations.
+   Git worktrees prevent *filesystem* collisions, not *architectural* collisions. Writing code involves dozens of implicit decisions (naming, error handling, helper abstractions, state assumptions). Two parallel writers in isolated contexts make incompatible implicit decisions, creating a "game of telephone" and painful semantic conflicts when their branches are merged. Parallel *readers* (researchers, reviewers) do not suffer from this because a single writer still owns all coherent code mutations.
    </details>
 
 2. **Why should an Evaluator agent in a Generator–Evaluator loop run in a completely fresh context window rather than continuing the Generator's conversation?**

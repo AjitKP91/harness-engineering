@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { Marked } from 'marked';
 import katex from 'katex';
 import { createHighlighter } from 'shiki';
+import { renderVisualDiagram } from './visual-diagrams.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SITE_ROOT = path.resolve(__dirname, '..');
@@ -112,6 +113,7 @@ const CHAPTER_FILES = [
   '07-reliability-and-evaluation/38-telemetry-tracing-and-token-cost-accounting.md',
   '07-reliability-and-evaluation/39-model-routing-and-rate-limit-fallbacks.md',
   '07-reliability-and-evaluation/40-agent-evaluation-harnesses-and-benchmarks.md',
+  '07-reliability-and-evaluation/41-putting-it-all-together-end-to-end-walkthrough.md',
 ];
 
 const READING_PATHS = [
@@ -247,6 +249,7 @@ const CHAPTER_SUMMARIES = {
   '38': 'Instrument agent traces and spans with OpenTelemetry GenAI conventions, normalize provider cache/reasoning token billing, and enforce runaway-spend kill switches.',
   '39': 'Abstract multiple LLM vendors, route tasks across model tiers, handle 429/529 outages with cache-sticky failover, and survive cross-model thinking-block handoffs.',
   '40': 'Replace vibes-based testing with containerized benchmark harnesses (SWE-bench, Terminal-Bench), multi-layer grading, pass@k vs. pass^k reliability math, and CI gates.',
+  '41': 'Trace the login-bug task from Chapter 00 turn-by-turn across all 7 harness layers: SSE streaming, prompt caching, OS sandboxing, LSP checks, checkpoints, transcripts, and telemetry.',
 };
 
 function slugifyHeading(text) {
@@ -410,6 +413,20 @@ async function main() {
   ]);
 
   let mermaidCounter = 0;
+  let visualCounter = 0;
+
+  function getMermaidDiagramTitle(source) {
+    const firstLine = (source || '')
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .find((l) => l && !l.startsWith('%%'));
+    if (!firstLine) return 'Architecture Diagram';
+    if (firstLine.startsWith('sequenceDiagram')) return 'Sequence Diagram';
+    if (firstLine.startsWith('stateDiagram')) return 'State Machine';
+    if (firstLine.startsWith('erDiagram')) return 'Data Model';
+    if (/^(flowchart|graph)\s+LR\b/.test(firstLine)) return 'Data Flow Diagram';
+    return 'Architecture Diagram';
+  }
 
   function renderMarkdown(markdown, sourceFilePath, collectHeadings = true) {
     const headings = [];
@@ -422,7 +439,18 @@ async function main() {
       return count === 0 ? base : `${base}-${count + 1}`;
     };
 
-    const withMath = preprocessMathOutsideCode(markdown);
+    const visualTokens = [];
+    const withVisualTokens = markdown.replace(
+      /<!--\s*visual:([a-z0-9-]+)\s*-->\s*\n+```mermaid[ \t]*\n[\s\S]*?^```[ \t]*$/gm,
+      (_, visualId) => {
+        const idx = visualTokens.length;
+        visualTokens.push(renderVisualDiagram(visualId));
+        visualCounter += 1;
+        return `\n@@VISUAL_TOKEN_${idx}@@\n`;
+      }
+    );
+
+    const withMath = preprocessMathOutsideCode(withVisualTokens);
     const marked = new Marked();
 
     marked.use({
@@ -446,10 +474,11 @@ async function main() {
           if (rawLang === 'mermaid') {
             mermaidCounter += 1;
             const mId = `mmd-${mermaidCounter}`;
+            const diagramTitle = getMermaidDiagramTitle(text);
             const b64 = Buffer.from(text, 'utf8').toString('base64');
-            return `<figure class="mermaid-figure" data-mermaid-id="${mId}" data-mermaid-b64="${b64}">
+            return `<figure class="mermaid-figure" data-mermaid-id="${mId}" data-diagram-title="${escapeHtml(diagramTitle)}" data-mermaid-b64="${b64}">
   <div class="mermaid-toolbar">
-    <span class="mermaid-badge">Architecture Diagram</span>
+    <span class="mermaid-badge">${escapeHtml(diagramTitle)}</span>
     <div class="mermaid-actions">
       <button type="button" class="mermaid-btn" data-action="zoom">Expand</button>
       <button type="button" class="mermaid-btn" data-action="copy">Copy source</button>
@@ -512,7 +541,10 @@ async function main() {
       },
     });
 
-    const html = marked.parse(withMath);
+    const rawHtml = marked.parse(withMath);
+    const html = rawHtml
+      .replace(/<p>@@VISUAL_TOKEN_(\d+)@@<\/p>/g, (_, idx) => visualTokens[Number(idx)])
+      .replace(/@@VISUAL_TOKEN_(\d+)@@/g, (_, idx) => visualTokens[Number(idx)]);
     return { html, headings };
   }
 
@@ -734,7 +766,7 @@ async function main() {
   await fs.writeFile(path.join(OUT_DIR, 'glossary.json'), JSON.stringify(glossaryEntries), 'utf-8');
 
   console.log(
-    `Built ${chaptersMeta.length} chapters (${totalWords.toLocaleString()} words, ${mermaidCounter} Mermaid diagrams), ${glossaryEntries.length} glossary terms, and ${searchItems.length} search entries.`
+    `Built ${chaptersMeta.length} chapters (${totalWords.toLocaleString()} words, ${mermaidCounter} Mermaid + ${visualCounter} bespoke diagrams), ${glossaryEntries.length} glossary terms, and ${searchItems.length} search entries.`
   );
 }
 

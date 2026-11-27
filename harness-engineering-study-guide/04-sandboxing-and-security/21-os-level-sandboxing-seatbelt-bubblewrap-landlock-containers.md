@@ -4,7 +4,7 @@
 
 # 21. OS-Level Sandboxing (macOS Seatbelt, Linux Bubblewrap/Landlock, Containers)
 
-In Module 3, we gave our coding agent hands: it can read files, patch code, run a shell, manage background processes, call MCP servers, and drive a browser. The moment you give a probabilistic model a shell tool, a sobering question arrives: **what stops a confused model—or a malicious string hidden in a repository—from wiping your home folder or silently uploading your private keys?**
+In Module 3, we gave our coding agent hands: it can read files, patch code, run a shell, manage background processes, call MCP servers, and drive a browser. The moment you give a probabilistic model a shell tool, a sobering question arrives: **what stops a confused model, or a malicious string hidden in a repository, from wiping your home folder or silently uploading your private keys?**
 
 This chapter introduces the foundation of agent security: **OS-level sandboxing**. You will learn why prompt instructions are never a real security boundary, how operating systems actually enforce isolation, and how modern coding agents choose between macOS Seatbelt, Linux Bubblewrap/Landlock, containers, and microVMs.
 
@@ -14,20 +14,20 @@ This chapter introduces the foundation of agent security: **OS-level sandboxing*
 
 Imagine lending a bright intern the keys to your workshop so they can repair a wooden chair.
 
-- **Prompt-only safety** is handing them the master key to the entire building—including the payroll office, the server room, and the fire-alarm panel—and taping a sticky note to their clipboard that says: *"Please only touch the wooden chair."*
-- **OS-level sandboxing** is putting the chair inside a locked glass-walled workbench room. Inside that room, the intern has every hammer, saw, and sander they need. Outside that room, the doors simply do not open—no matter how persuasive a prank note someone slips under the door, and no matter how badly the intern misunderstands an instruction.
+- **Prompt-only safety** is handing them the master key to the entire building (including the payroll office, the server room, and the fire-alarm panel) and taping a sticky note to their clipboard that says: *"Please only touch the wooden chair."*
+- **OS-level sandboxing** is putting the chair inside a locked glass-walled workbench room. Inside that room, the intern has every hammer, saw, and sander they need. Outside that room, the doors simply do not open: no matter how persuasive a prank note someone slips under the door, and no matter how badly the intern misunderstands an instruction.
 
 Notice the difference: **the sticky note relies on obedience; the locked room relies on physics.**
 
-In software, the "physics" of your computer is enforced by the **operating system kernel**—the privileged core program (like the macOS XNU kernel or the Linux kernel) that mediates every single interaction between an application and your hardware. A program cannot read a file, delete a directory, or open a network connection directly. It must ask the kernel via a **system call (syscall)**—a formal request like `open()`, `unlink()`, or `connect()`.
+In software, the "physics" of your computer is enforced by the **operating system kernel**: the privileged core program (like the macOS XNU kernel or the Linux kernel) that mediates every single interaction between an application and your hardware. A program cannot read a file, delete a directory, or open a network connection directly. It must ask the kernel via a **system call (syscall)**: a formal request like `open()`, `unlink()`, or `connect()`.
 
-**OS-level sandboxing** tells the kernel, *before* the agent's command even starts: *"For this child process and every child process it spawns, deny any syscall that tries to write outside the project folder or talk to the internet."* Once the kernel locks that door, the agent can be 100% confused, hallucinating, or tricked—and the kernel still answers every out-of-bounds request with a blunt `EPERM` ("Operation not permitted").
+**OS-level sandboxing** tells the kernel, *before* the agent's command even starts: *"For this child process and every child process it spawns, deny any syscall that tries to write outside the project folder or talk to the internet."* Once the kernel locks that door, the agent can be 100% confused, hallucinating, or tricked, and the kernel still answers every out-of-bounds request with a blunt `EPERM` ("Operation not permitted").
 
 ### What Breaks Without OS-Level Sandboxing?
 
 Without a real sandbox around tool execution:
 1. **Honest mistakes become disasters:** An agent trying to clean a build directory generates `rm -rf $BUILD_DIR/*` when `$BUILD_DIR` is empty, or runs a cleanup script from the wrong working directory.
-2. **Hostile dependencies run unchecked:** Running `npm test` or `pytest` executes arbitrary third-party code in your repo and its packages—all running with *your* user account's full privileges.
+2. **Hostile dependencies run unchecked:** Running `npm test` or `pytest` executes arbitrary third-party code in your repo and its packages; all running with *your* user account's full privileges.
 3. **Indirect prompt injection becomes remote code execution:** A malicious comment in a GitHub issue, a poisoned `README.md`, or a hostile web page tricks the LLM into running an exfiltration command. (We dive deeply into prompt injection in Chapter 24.)
 4. **Users suffer approval fatigue:** Without a safe cage, the harness has to nag the human before *every* command (`ls`, `pytest`, `git diff`, `npm run build`), pushing frustrated developers toward disabling safety checks altogether (`--yolo`).
 
@@ -35,7 +35,7 @@ Without a real sandbox around tool execution:
 
 ## 2. Why This Matters in a Real Agent Harness
 
-There is a counterintuitive truth in harness engineering: **stronger sandboxing does not just make an agent safer—it makes the agent dramatically faster and more autonomous.**
+There is a counterintuitive truth in harness engineering: **stronger sandboxing does not just make an agent safer; it makes the agent dramatically faster and more autonomous.**
 
 Think about the daily loop of a real coding agent:
 - Run the test suite (`pytest` / `vitest`).
@@ -52,7 +52,7 @@ When commands execute inside a tight OS sandbox (writable only inside the worksp
 
 ## 3. The Big Picture (Defense-in-Depth Architecture)
 
-No single security layer is invincible. Great agent harnesses stack **defense in depth**—multiple independent barriers so that if one layer fails, the next layer still holds.
+No single security layer is invincible. Great agent harnesses stack **defense in depth**: multiple independent barriers so that if one layer fails, the next layer still holds.
 
 ```mermaid
 flowchart TD
@@ -91,7 +91,7 @@ Why does this fail as a security boundary?
 2. **LLMs make mundane mistakes.** Even with zero attackers involved, a model can miscalculate a relative path (`../../../`), forget what directory a shell session is in, or invoke a build tool (`make clean`, `npm install`) whose *internal scripts* do things the LLM never anticipated.
 3. **Security must be deterministic, not probabilistic.** Even if a model obeys your safety prompt 99.9% of the time, an active engineering team runs tens of thousands of tool calls per week. A 0.1% failure rate guarantees multiple breaches per week.
 
-> **Golden Rule of Harness Security:** System prompts are useful for *guidance and ergonomics* (so the agent doesn't waste turns attempting forbidden actions). **Only deterministic code outside the model—and kernel/hardware enforcement beneath the process—counts as security.**
+> **Golden Rule of Harness Security:** System prompts are useful for *guidance and ergonomics* (so the agent doesn't waste turns attempting forbidden actions). **Only deterministic code outside the model, and kernel/hardware enforcement beneath the process, counts as security.**
 
 ---
 
@@ -109,7 +109,7 @@ Before looking at specific tools, let's build a clear mental map of the four mai
 
 Let's define three key words from this table gently so there's zero fog:
 - **Namespace (Linux):** A kernel feature that gives a process its own private view of a system resource. A *mount namespace* gives it its own view of the filesystem tree; a *network namespace* gives it its own private network interfaces (often just `lo`, with no internet card at all); a *PID namespace* makes the process think it is Process #1 so it cannot see or kill your other running apps.
-- **cgroup (Control Group):** A Linux kernel feature that caps how much CPU, RAM, or number of processes (`pids.max`) a group of processes can consume—stopping accidental fork bombs or runaway memory leaks from freezing your laptop.
+- **cgroup (Control Group):** A Linux kernel feature that caps how much CPU, RAM, or number of processes (`pids.max`) a group of processes can consume; stopping accidental fork bombs or runaway memory leaks from freezing your laptop.
 - **Hypervisor / MicroVM:** A hypervisor uses special isolation hardware built into modern CPUs (Intel VT-x, AMD-V, Apple Silicon Virtualization extensions) to run an entire tiny guest operating system inside a hardware fence. A **microVM** strips away unnecessary desktop hardware emulation (no virtual USB ports, no virtual sound cards, no BIOS) so it boots in a fraction of a second instead of 30 seconds.
 
 ---
@@ -120,7 +120,7 @@ If you build a local coding agent for developers, a huge share of your users are
 
 #### How It Works
 
-A harness launches a child command through `/usr/bin/sandbox-exec`, passing a tiny policy script written in **SBPL (Sandbox Profile Language)**—a Scheme/Lisp-like list of `allow` and `deny` rules evaluated directly inside the macOS kernel on every syscall:
+A harness launches a child command through `/usr/bin/sandbox-exec`, passing a tiny policy script written in **SBPL (Sandbox Profile Language)**: a Scheme/Lisp-like list of `allow` and `deny` rules evaluated directly inside the macOS kernel on every syscall:
 
 ```bash
 sandbox-exec -f /tmp/agent-profile.sb -- pytest tests/
@@ -173,16 +173,16 @@ Here is a readable, annotated example of a defensive **workspace-write, offline-
 
 Seatbelt is fast (adds only a few milliseconds per command) and ships pre-installed on every Mac, which is why Claude Code (`sandbox-runtime`), OpenAI Codex CLI, and Gemini CLI all use it. However, it has real quirks:
 
-1. **Officially marked "deprecated" by Apple:** Running `man sandbox-exec` prints a deprecation warning, because Apple prefers App Sandbox entitlements compiled into signed `.app` bundles. In practice, macOS system daemons and major developer tools still rely on Seatbelt heavily—and there is no other built-in, zero-VM CLI sandbox API on macOS—so harnesses continue using it while monitoring Apple's newer Virtualization/Containerization APIs as a long-term path.
+1. **Officially marked "deprecated" by Apple:** Running `man sandbox-exec` prints a deprecation warning, because Apple prefers App Sandbox entitlements compiled into signed `.app` bundles. In practice, macOS system daemons and major developer tools still rely on Seatbelt heavily (and there is no other built-in, zero-VM CLI sandbox API on macOS) so harnesses continue using it while monitoring Apple's newer Virtualization/Containerization APIs as a long-term path.
 2. **Symlinks and `/tmp` vs. `/private/tmp`:** On macOS, `/tmp` is a symbolic link to `/private/tmp`, and `/var` is a link to `/private/var`. Seatbelt evaluates rules against **canonical (resolved) kernel paths**. If your profile allows `(subpath "/tmp/scratch")` without resolving symlinks first, writes to `/tmp/scratch/out.txt` will mysteriously fail with `EPERM`! Always run `realpath()` on every path before injecting it into an SBPL profile.
-3. **Rule precedence ("last match wins" vs. specificity):** SBPL's rule evaluation can surprise newcomers—more specific rules or later rules can override earlier broad rules, and `(allow file-read*)` followed by `(deny file-read* (subpath ...))` must be carefully tested against edge cases like `file-read-metadata` (which `stat()` needs on parent directories like `/Users/alice` just to traverse down to `/Users/alice/projects/my-app`).
-4. **No filesystem mount remapping:** Unlike Linux `bwrap`, Seatbelt cannot mount a fake empty directory over `~/.ssh` or give the process a fake PID namespace—it only filters syscalls against the real host tree.
+3. **Rule precedence ("last match wins" vs. specificity):** SBPL's rule evaluation can surprise newcomers; more specific rules or later rules can override earlier broad rules, and `(allow file-read*)` followed by `(deny file-read* (subpath ...))` must be carefully tested against edge cases like `file-read-metadata` (which `stat()` needs on parent directories like `/Users/alice` just to traverse down to `/Users/alice/projects/my-app`).
+4. **No filesystem mount remapping:** Unlike Linux `bwrap`, Seatbelt cannot mount a fake empty directory over `~/.ssh` or give the process a fake PID namespace; it only filters syscalls against the real host tree.
 
 ---
 
 ### 4.4 Linux Bubblewrap (`bwrap`), Landlock LSM, and `seccomp-bpf`
 
-Linux offers an extraordinary toolkit for unprivileged sandboxing—meaning **you do not need `root` or `sudo` privileges** to lock down an agent's child process. Modern Linux coding-agent harnesses typically combine up to three kernel primitives:
+Linux offers an extraordinary toolkit for unprivileged sandboxing, meaning **you do not need `root` or `sudo` privileges** to lock down an agent's child process. Modern Linux coding-agent harnesses typically combine up to three kernel primitives:
 
 #### 1. Bubblewrap (`bwrap`) — Lightweight Unprivileged Namespaces
 
@@ -211,18 +211,18 @@ bwrap \
 
 Look closely at what that 15-line invocation achieves in ~10 milliseconds:
 - `--ro-bind /usr /usr` (and `/bin`, `/lib`, `/etc`): System tools are visible and executable, but **strictly read-only**.
-- `--bind /home/alice/projects/my-app /workspace`: Only the project folder is writable, mounted cleanly at `/workspace`. Notice `/home/alice/.ssh` and `/home/alice/.aws` are **never mounted at all**—to the sandboxed process, they literally do not exist!
+- `--bind /home/alice/projects/my-app /workspace`: Only the project folder is writable, mounted cleanly at `/workspace`. Notice `/home/alice/.ssh` and `/home/alice/.aws` are **never mounted at all**: to the sandboxed process, they literally do not exist!
 - `--ro-bind .../my-app/.git/hooks /workspace/.git/hooks`: Even *inside* the writable workspace, `.git/hooks` is overlaid as read-only.
 - `--tmpfs /tmp`: A fresh, in-memory temporary folder that evaporates the instant the command finishes.
 - `--unshare-all`: Unshares the user, PID, IPC, UTS, and **network** namespaces. Without `--share-net`, the process has no external network interfaces at all.
-- `--die-with-parent`: If the harness crashes or the user hits Ctrl+C, the kernel guarantees the sandboxed process tree dies immediately—no orphaned background processes!
+- `--die-with-parent`: If the harness crashes or the user hits Ctrl+C, the kernel guarantees the sandboxed process tree dies immediately; no orphaned background processes!
 - `--new-session`: Creates a new terminal session so a hostile child process cannot inject fake keystrokes into the parent terminal using the infamous `TIOCSTI` ioctl trick.
 
 #### 2. Landlock LSM — Kernel-Enforced Access Control Inside Any Process
 
 What if `bwrap` is unavailable, or unprivileged user namespaces are disabled by a hardened enterprise Linux distribution (like Ubuntu's AppArmor userns restrictions)? Enter **Landlock**.
 
-**Landlock** is a **Linux Security Module (LSM)** built directly into the mainline Linux kernel (since Linux 5.13). An **LSM** is a framework of hooks inside the kernel where security modules inspect operations before allowing them. Unlike older LSMs like SELinux or AppArmor (which require a system administrator with root privileges to load policies), **Landlock is designed so any ordinary unprivileged process can sandbox itself**—and once a process enables a Landlock ruleset (combined with `PR_SET_NO_NEW_PRIVS`), neither it nor any child it spawns can ever loosen or remove those rules.
+**Landlock** is a **Linux Security Module (LSM)** built directly into the mainline Linux kernel (since Linux 5.13). An **LSM** is a framework of hooks inside the kernel where security modules inspect operations before allowing them. Unlike older LSMs like SELinux or AppArmor (which require a system administrator with root privileges to load policies), **Landlock is designed so any ordinary unprivileged process can sandbox itself**: and once a process enables a Landlock ruleset (combined with `PR_SET_NO_NEW_PRIVS`), neither it nor any child it spawns can ever loosen or remove those rules.
 
 Landlock has evolved rapidly across **ABI (Application Binary Interface) versions**:
 
@@ -239,7 +239,7 @@ Because Linux servers and developer laptops run many different kernel versions, 
 
 #### 3. `seccomp-bpf` — Syscall Filtering
 
-Even with namespaces and Landlock, the Linux kernel exposes over 400 system calls—some of which are exotic, rarely used by normal coding tools, and historically a source of kernel bugs (like `ptrace`, `kexec_load`, `mount`, `bpf`, or raw `socket` creation).
+Even with namespaces and Landlock, the Linux kernel exposes over 400 system calls: some of which are exotic, rarely used by normal coding tools, and historically a source of kernel bugs (like `ptrace`, `kexec_load`, `mount`, `bpf`, or raw `socket` creation).
 
 **`seccomp-bpf`** (Secure Computing Mode with Berkeley Packet Filter) attaches a tiny, kernel-verified filter program to a process that inspects every syscall number and its arguments before execution. For example, OpenAI's Codex CLI combines **Landlock** (for filesystem boundaries) with **`seccomp-bpf`** (for blocking network socket syscalls like `socket(AF_INET, ...)` when running offline on older kernels before Landlock ABI v4, or blocking `AF_PACKET` / raw sockets completely).
 
@@ -257,7 +257,7 @@ OS-level sandboxes (Seatbelt, `bwrap`, Landlock) are unbeatable for **local deve
 
 Three scenarios demand a stronger boundary:
 1. **Cloud / Multi-tenant agents:** You are running coding agents for thousands of users on your own cloud servers. A single host kernel vulnerability in a shared-kernel sandbox could let one user escape into another customer's container.
-2. **Autonomous / Unattended ("YOLO") execution on untrusted repos:** You want an agent to clone an unknown repository, run `npm install`, start servers, and run tests for 30 minutes with zero human prompts—while guaranteeing your host Mac/Linux machine is 100% untouchable.
+2. **Autonomous / Unattended ("YOLO") execution on untrusted repos:** You want an agent to clone an unknown repository, run `npm install`, start servers, and run tests for 30 minutes with zero human prompts, while guaranteeing your host Mac/Linux machine is 100% untouchable.
 3. **Reproducible environments:** The agent needs a specific version of Postgres, Go, and Rust that isn't installed on the developer's laptop.
 
 Let's compare the four heavyweight sandbox architectures used in 2025–2026:
@@ -267,11 +267,11 @@ Let's compare the four heavyweight sandbox architectures used in 2025–2026:
 | **Docker / Podman (Standard OCI Containers)** | Linux namespaces + cgroups + seccomp + AppArmor/SELinux on top of an OCI container image. | ~150–800 ms (warm image) | Medium (shared Linux kernel) | Huge ecosystem, easy local setup (`docker run --rm --network=none`), familiar `Dockerfile`s. Weakest against Linux kernel zero-days unless paired with gVisor/Kata. |
 | **gVisor (`runsc`)** | Implements a clean-room Linux syscall interface in Go (the `sentry` user-space kernel). Container syscalls hit `sentry`, which issues only a tiny subset of syscalls to the real host kernel. | ~150–400 ms | High (drastically reduced host kernel exposure) | Drops right into Docker/Kubernetes (`--runtime=runsc`). Slightly slower on heavy filesystem I/O (like huge `npm install` trees), great for cloud code execution. |
 | **Firecracker / Kata Containers** | Boots a stripped-down Linux kernel inside a KVM hardware microVM. Each sandbox has its own kernel, memory space, and virtual block device. | ~125–300 ms (or ~20 ms via memory snapshots!) | **Very High** (hardware CPU virtualization boundary) | Industry gold standard for cloud coding-agent platforms (E2B, Modal, Fly.io Sprites). Requires KVM (bare-metal or nested virtualization on Linux). |
-| **Apple Containerization / Virtualization Framework** | On Apple Silicon Macs, spins up lightweight hardware-isolated Linux microVMs directly from standard OCI images via macOS's native Virtualization framework—no heavy monolithic Docker Desktop VM required. | ~300 ms–1 s | **Very High** (dedicated Linux guest kernel on Apple Silicon) | Game-changer for **local macOS coding agents**: run `npm install` and arbitrary Linux build scripts inside a disposable microVM while your host macOS files stay completely detached. |
+| **Apple Containerization / Virtualization Framework** | On Apple Silicon Macs, spins up lightweight hardware-isolated Linux microVMs directly from standard OCI images via macOS's native Virtualization framework: no heavy monolithic Docker Desktop VM required. | ~300 ms–1 s | **Very High** (dedicated Linux guest kernel on Apple Silicon) | Game-changer for **local macOS coding agents**: run `npm install` and arbitrary Linux build scripts inside a disposable microVM while your host macOS files stay completely detached. |
 
 #### The Snapshot Trick: Making MicroVMs Feel Instant
 
-Wait—how do cloud platforms like E2B, Modal, or Fly.io boot a full Linux microVM in ~50–150 milliseconds?
+Wait: how do cloud platforms like E2B, Modal, or Fly.io boot a full Linux microVM in ~50–150 milliseconds?
 Instead of cold-booting Linux and running `apt-get` every time an agent starts, they **boot once, install the toolchain, pause the microVM, and save its exact RAM + CPU register state to disk as a snapshot**. When an agent needs a fresh sandbox, the hypervisor memory-maps that snapshot (using copy-on-write pages) and resumes execution from the exact millisecond it paused. You get the isolation of a dedicated physical machine with the responsiveness of a subprocess.
 
 ---
@@ -293,7 +293,7 @@ Real-world coding agents have converged remarkably fast on **OS-native sandboxin
 Even experienced systems engineers hit subtle traps when sandboxing coding agents. Watch out for these six failure modes:
 
 1. **Forgetting to protect `.git/` and harness config inside the writable workspace.**
-   - *The trap:* You make the whole project directory writable. A prompt-injected agent writes a malicious script into `.git/hooks/pre-commit` or edits `.claude/settings.json` / `.codex/config.toml` to auto-approve future commands. Later, the *human* runs `git commit` outside the sandbox—and executes the payload!
+   - *The trap:* You make the whole project directory writable. A prompt-injected agent writes a malicious script into `.git/hooks/pre-commit` or edits `.claude/settings.json` / `.codex/config.toml` to auto-approve future commands. Later, the *human* runs `git commit` outside the sandbox, and executes the payload!
    - *The fix:* Overlay `.git/hooks` (and `.git/config`, plus any `.claude/`, `.codex/`, `.gemini/`, `.vscode/tasks.json` folders) as **read-only** even inside a `workspace-write` sandbox.
 2. **Breaking macOS Seatbelt with unresolved symlinks.**
    - *The trap:* Passing `/var/folders/...` or `/tmp/...` or a symlinked project directory directly into an SBPL profile. Seatbelt checks the canonical path (`/private/var/folders/...`), so every write silently fails with `EPERM`, causing the agent to thrash and ask to disable the sandbox.
@@ -303,13 +303,13 @@ Even experienced systems engineers hit subtle traps when sandboxing coding agent
    - *The fix:* **Always fail closed.** If sandboxing is enabled and the required OS primitive is missing or refuses to initialize, refuse to execute and tell the user clearly how to install `bubblewrap` or explicitly opt into unsandboxed execution.
 4. **Mounting the Docker socket (`/var/run/docker.sock`) into a sandbox container.**
    - *The trap:* A user wants the agent to run `docker compose up`, so you mount `/var/run/docker.sock` inside the sandbox container.
-   - *The fix:* Never do this casually—access to the host Docker socket is **equivalent to full root access on the host machine** (any process with socket access can spawn a privileged container mounting `/` from the host). Use rootless Docker-in-Docker inside a dedicated microVM instead.
+   - *The fix:* Never do this casually; access to the host Docker socket is **equivalent to full root access on the host machine** (any process with socket access can spawn a privileged container mounting `/` from the host). Use rootless Docker-in-Docker inside a dedicated microVM instead.
 5. **Forgetting resource limits (CPU, RAM, PIDs, Disk).**
    - *The trap:* A buggy test or infinite recursion spawns 10,000 processes or writes a 50 GB log file, hanging the developer's laptop even though the sandbox prevented unauthorized file access.
    - *The fix:* Enforce timeouts, `RLIMIT_AS` / `RLIMIT_NPROC` (or Linux cgroups `memory.max` / `pids.max`), and disk quotas alongside filesystem/network rules.
 6. **Sandboxing the shell tool while leaving file-write or MCP tools unsandboxed.**
    - *The trap:* Your `run_shell` tool is wrapped in Seatbelt/bwrap, but your built-in `write_file` tool or a local stdio MCP server runs directly in the unsandboxed parent process without path validation.
-   - *The fix:* Enforce the same workspace boundaries across **every** tool—either by wrapping the entire agent/MCP process tree (as `@anthropic-ai/sandbox-runtime` does) or by applying strict deterministic path guards to in-process tools (Chapter 22).
+   - *The fix:* Enforce the same workspace boundaries across **every** tool, either by wrapping the entire agent/MCP process tree (as `@anthropic-ai/sandbox-runtime` does) or by applying strict deterministic path guards to in-process tools (Chapter 22).
 
 ---
 
@@ -319,7 +319,7 @@ Let's build a clean, working ~110-line Python sandbox runner that wraps any shel
 - **macOS:** A dynamically generated **Seatbelt (`.sb`)** profile passed to `/usr/bin/sandbox-exec`.
 - **Linux:** An unprivileged **Bubblewrap (`bwrap`)** command with read-only system mounts, writable workspace, ephemeral `/tmp`, protected `.git/hooks`, and offline network isolation.
 
-Read the comments carefully—notice how every path is canonicalized, sensitive workspace subpaths are locked read-only, and missing sandbox binaries **fail closed** instead of silently running naked.
+Read the comments carefully: notice how every path is canonicalized, sensitive workspace subpaths are locked read-only, and missing sandbox binaries **fail closed** instead of silently running naked.
 
 ```python
 """
@@ -521,13 +521,13 @@ Try running this on macOS or Linux: `ls -la` succeeds instantaneously, while tou
 2. **Why do harnesses like Codex CLI explicitly mark `.git/hooks` read-only even when the rest of the workspace is writable?**
    <details>
    <summary>Show Answer</summary>
-   Because `.git/hooks` contains executable scripts (like `pre-commit` or `post-checkout`) that Git runs automatically. If a sandboxed agent modifies `.git/hooks/pre-commit`, that script will later execute **outside** the sandbox with the user's full host privileges the next time the developer runs `git commit` in their normal terminal—turning a sandboxed write into a sandbox escape.
+   Because `.git/hooks` contains executable scripts (like `pre-commit` or `post-checkout`) that Git runs automatically. If a sandboxed agent modifies `.git/hooks/pre-commit`, that script will later execute **outside** the sandbox with the user's full host privileges the next time the developer runs `git commit` in their normal terminal, turning a sandboxed write into a sandbox escape.
    </details>
 
 3. **What is the practical difference between Bubblewrap (`bwrap`) and Landlock on Linux?**
    <details>
    <summary>Show Answer</summary>
-   Bubblewrap uses unprivileged Linux **namespaces** (mount, PID, network, IPC) to construct an isolated virtual view of the machine—sensitive directories like `~/.ssh` are never even mounted into the sandbox. **Landlock** is an unprivileged **Linux Security Module (LSM)** that attaches immutable path-hierarchy and (since ABI v4 / Linux 6.7) TCP port rules directly inside the kernel without needing user namespaces. Combining Landlock + `seccomp-bpf` works even on Linux hosts where unprivileged user namespaces are restricted, and stacking them with `bwrap` provides strong defense in depth.
+   Bubblewrap uses unprivileged Linux **namespaces** (mount, PID, network, IPC) to construct an isolated virtual view of the machine: sensitive directories like `~/.ssh` are never even mounted into the sandbox. **Landlock** is an unprivileged **Linux Security Module (LSM)** that attaches immutable path-hierarchy and (since ABI v4 / Linux 6.7) TCP port rules directly inside the kernel without needing user namespaces. Combining Landlock + `seccomp-bpf` works even on Linux hosts where unprivileged user namespaces are restricted, and stacking them with `bwrap` provides strong defense in depth.
    </details>
 
 4. **Why do cloud coding-agent platforms (like E2B or Modal) prefer Firecracker microVMs over standard Docker containers, and how do they keep startup fast?**

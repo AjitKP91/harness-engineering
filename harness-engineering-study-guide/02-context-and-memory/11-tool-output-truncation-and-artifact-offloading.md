@@ -4,7 +4,7 @@
 
 # 11. Tool Output Truncation & Artifact Offloading
 
-In Chapter 10, you built a cleanup crew—context compaction—to tidy up a long session after dozens of turns. But what if **a single tool call** drops 350,000 tokens onto the model's desk in half a second?
+In Chapter 10, you built a cleanup crew, context compaction, to tidy up a long session after dozens of turns. But what if **a single tool call** drops 350,000 tokens onto the model's desk in half a second?
 
 It happens constantly in real software engineering. An agent runs `npm test` and hits an infinite logging loop. It runs `cat package-lock.json`. It greps for `"token"` across a repo and accidentally matches a 4 MB minified JavaScript bundle on a single line. Before compaction even has a chance to run, **one unfiltered tool result can blow past a 200k-token context window**, crash the session, waste dollars on a single API call, or bury a 3-line stack trace under 10,000 lines of noise.
 
@@ -18,9 +18,9 @@ Go back to our **Remote Specialist on a Phone Call** from Chapter 00.
 
 Suppose the specialist asks the on-site engineer: *"Run the test suite and tell me why checkout failed."*
 
-Now imagine the test runner spits out a **600-page log** listing 18,000 passing tests, noisy terminal color codes, and 200 pages of webpack output—and the on-site engineer tries to read all 600 pages out loud over the phone.
+Now imagine the test runner spits out a **600-page log** listing 18,000 passing tests, noisy terminal color codes, and 200 pages of webpack output, and the on-site engineer tries to read all 600 pages out loud over the phone.
 
-The call grinds to a halt. The specialist's notepad fills up, and the single line that actually matters—`FAIL tests/checkout.py: AssertionError: expected 200, got 500` on page 598—gets buried in noise.
+The call grinds to a halt. The specialist's notepad fills up, and the single line that actually matters, `FAIL tests/checkout.py: AssertionError: expected 200, got 500` on page 598, gets buried in noise.
 
 What does a *great* on-site engineer do instead?
 
@@ -38,17 +38,17 @@ That three-step habit is **content-aware filtering + head/tail truncation + arti
 | Term | Plain-English Meaning |
 | :--- | :--- |
 | **Truncation** | Deliberately cutting a long piece of text down to a safe maximum size before inserting it into the LLM's context window. |
-| **Head + Tail Truncation** | Keeping the beginning (*head*) and the end (*tail*) of a long output while omitting the repetitive middle—because headers start at the top and final errors/summaries appear at the bottom. |
+| **Head + Tail Truncation** | Keeping the beginning (*head*) and the end (*tail*) of a long output while omitting the repetitive middle, because headers start at the top and final errors/summaries appear at the bottom. |
 | **Artifact Offloading** | Saving the complete, uncut output of a tool to a temporary **scratch file** on disk, then handing the LLM a small preview plus the file path so it can inspect the rest on demand. |
 | **ANSI Escape Codes** | Invisible character sequences like `\x1b[31m` that terminals use to draw colors, bold text, and moving progress bars. Humans see red text; LLMs see noisy token soup. |
-| **Minified File** | Code (like `bundle.min.js`) compressed onto a **single gigantic line** with all spaces and newlines removed—a classic trap for line-based truncators. |
+| **Minified File** | Code (like `bundle.min.js`) compressed onto a **single gigantic line** with all spaces and newlines removed: a classic trap for line-based truncators. |
 | **Pagination** | Reading a large file in small, numbered slices (e.g., lines 1–200, then 201–400) instead of all at once. |
 
 ---
 
 ## 2. Why This Matters in a Real Agent Harness
 
-You might wonder: *"Models have 200k- to 1M-token windows now—why bother truncating a 40k-token test log?"* Four hard realities of production harnesses answer that question:
+You might wonder: *"Models have 200k- to 1M-token windows now; why bother truncating a 40k-token test log?"* Four hard realities of production harnesses answer that question:
 
 1. **Preventing Instant Single-Turn Crashes:** One runaway command can easily produce 2–10 MB of stdout (~500k–2.5M tokens), exceeding even the largest model's context limit and killing the turn before the agent can react.
 2. **Stopping Silent Truncation Hallucinations:** If a harness silently slices off output without telling the model *that* text was cut (or *where* to find the rest), the LLM assumes it saw the whole output. It will confidently declare *"All tests passed!"* when 14 failures were sitting past the cutoff.
@@ -59,7 +59,7 @@ You might wonder: *"Models have 200k- to 1M-token windows now—why bother trunc
 
 ## 3. The Big Picture
 
-Every tool output—from shell commands, file reads, code searches, HTTP calls, or MCP servers—should pass through a single deterministic **Output Guard** before it is ever appended to the conversation array:
+Every tool output (from shell commands, file reads, code searches, HTTP calls, or MCP servers) should pass through a single deterministic **Output Guard** before it is ever appended to the conversation array:
 
 ```mermaid
 flowchart TD
@@ -84,7 +84,7 @@ Notice the elegance of this pipeline: **the LLM never loses access to data, and 
 
 ### 4.1 Why a Single `npm test` or `cat` Can Blow Up a 200k-Token Window
 
-In normal English prose, 1 token is roughly 4 characters. In code, JSON, minified JS, stack traces, and terminal escape codes, tokenization is *much denser*—often **1.5 to 3 characters per token** because punctuation, symbols, and random hashes split into individual tokens.
+In normal English prose, 1 token is roughly 4 characters. In code, JSON, minified JS, stack traces, and terminal escape codes, tokenization is *much denser*: often **1.5 to 3 characters per token** because punctuation, symbols, and random hashes split into individual tokens.
 
 Look at how quickly ordinary developer commands explode a 200,000-token context window:
 
@@ -106,8 +106,8 @@ Even worse: the agent didn't do anything "crazy." Running `npm test` or `rg` is 
 Once an output exceeds your inline budget (for example, **200 lines or 16 KB**, whichever comes first), *how* should you slice it? Different truncation shapes have wildly different failure modes:
 
 #### Why Naive Cuts Fail
-- **Head-Only Truncation (`text[:16000]`):** Keeps the first 200 lines and drops the rest. Great for reading the top of a source file, **terrible for shell commands**. In `pytest`, `cargo test`, or `npm run build`, the first 200 lines are setup banners and passing tests—the actual failure summary and stack trace sit at the *very bottom* and get chopped off!
-- **Tail-Only Truncation (`text[-16000:]`):** Keeps the last 200 lines. Much better for shell summaries, **but fails on cascading compiler errors**. In TypeScript, C++, or Rust, a single missing bracket or import at line 12 often triggers 150 bogus cascading errors afterward. Tail-only shows errors #120–#150 while hiding Error #1—the only real bug!
+- **Head-Only Truncation (`text[:16000]`):** Keeps the first 200 lines and drops the rest. Great for reading the top of a source file, **terrible for shell commands**. In `pytest`, `cargo test`, or `npm run build`, the first 200 lines are setup banners and passing tests: the actual failure summary and stack trace sit at the *very bottom* and get chopped off!
+- **Tail-Only Truncation (`text[-16000:]`):** Keeps the last 200 lines. Much better for shell summaries, **but fails on cascading compiler errors**. In TypeScript, C++, or Rust, a single missing bracket or import at line 12 often triggers 150 bogus cascading errors afterward. Tail-only shows errors #120–#150 while hiding Error #1: the only real bug!
 - **Line-Only Caps (`lines[:200]`):** Catastrophic on minified files. A 5 MB `bundle.min.js` has **1 line**. It sails right past a 200-line cap and dumps 1.5 million tokens into your prompt.
 - **Byte-Only Caps (Raw Byte Slicing `raw_bytes[:16000]`):** Can slice straight through the middle of a multi-byte UTF-8 character (like an emoji or CJK character), producing broken Unicode (`UnicodeDecodeError`) or corrupting a JSON payload. Always decode safely and slice on **character or UTF-8 codepoint boundaries** (and preferably newline boundaries).
 
@@ -175,14 +175,14 @@ Tests:       1 failed, 319 passed, 320 total
 Look at what just happened:
 - **98.5% of the tokens vanished** before touching the context window.
 - In 9 out of 10 cases, the tail preview *already* contains the exact failing test (`invoice.test.ts:88`), so the agent fixes the bug immediately without even opening the scratch file!
-- In the 1 out of 10 cases where the root cause was in the omitted middle, the agent simply runs `grep("FAIL|Error:", "/tmp/agent-scratch/sess_8f2a/call_019_npm_test.log")` in 5 milliseconds—without re-running a 14-second test suite!
+- In the 1 out of 10 cases where the root cause was in the omitted middle, the agent simply runs `grep("FAIL|Error:", "/tmp/agent-scratch/sess_8f2a/call_019_npm_test.log")` in 5 milliseconds, without re-running a 14-second test suite!
 
 #### Four Hygiene Rules for Scratch Artifacts
 
 1. **Keep scratch files OUT of the user's Git working tree.** Store them in an OS temp directory or a dedicated session directory (e.g., `~/.my-agent/sessions/<id>/artifacts/` or `/tmp/agent-scratch/<id>/`). If you drop scratch files into the repo root, `git status` gets polluted, `git add .` accidentally commits megabytes of logs, and codebase `ripgrep` searches match old debug output!
-2. **Use deterministic, collision-free filenames:** Include the tool call ID and sanitized tool name—e.g., `019_call_9a3f_run_command.log`. That keeps artifacts traceable from your JSONL transcript (Ch. 37).
+2. **Use deterministic, collision-free filenames:** Include the tool call ID and sanitized tool name; e.g., `019_call_9a3f_run_command.log`. That keeps artifacts traceable from your JSONL transcript (Ch. 37).
 3. **Redact secrets *before* writing to disk (Ch. 25):** If a failing command printed an API token in its traceback, run your secret redactor before saving the artifact so you don't persist raw credentials in `/tmp`.
-4. **Enforce disk quotas and cleanup:** Cap individual artifact sizes (e.g., 50 MB max—stop reading stdout from an infinite `yes` loop!) and clean up scratch directories when old sessions expire.
+4. **Enforce disk quotas and cleanup:** Cap individual artifact sizes (e.g., 50 MB max; stop reading stdout from an infinite `yes` loop!) and clean up scratch directories when old sessions expire.
 
 ---
 
@@ -191,7 +191,7 @@ Look at what just happened:
 Before you even count lines or bytes for truncation, you must **normalize raw output**. Raw bytes from shells and files contain four notorious traps that silently wreck tokenizers and context windows:
 
 #### 1. Binary & Non-UTF-8 Files
-If an agent accidentally runs `cat logo.png` or `read_file("dist/app.wasm")`, raw binary bytes decoded with `errors="replace"` turn into tens of thousands of `` replacement characters—each burning a full token and conveying zero information.
+If an agent accidentally runs `cat logo.png` or `read_file("dist/app.wasm")`, raw binary bytes decoded with `errors="replace"` turn into tens of thousands of `` replacement characters: each burning a full token and conveying zero information.
 - **Detection heuristic:** Inspect the first 8 KB of raw bytes. If it contains a null byte (`b"\x00"`), matches known binary magic bytes (`\x89PNG`, `%PDF-`, `PK\x03\x04`, `\x7fELF`), or has more than ~30% non-printable control bytes (excluding `\t`, `\n`, `\r`), classify it as **binary**.
 - **Action:** Do *not* send the bytes to the LLM. Return a clean metadata card: `[Binary output detected: 412,830 bytes, detected type: PNG image. Saved to /tmp/agent-scratch/.../out.bin]`.
 
@@ -204,8 +204,8 @@ Modern CLI tools (`jest`, `vitest`, `cargo`, `pip`, `docker`, `npm`) love vibran
   2. Simulate `\r` overwrites on each line: for any line containing `\r` (after converting `\r\n` to `\n`), keep only the text after the *last* `\r` (the final visible frame)! That single line of code can shrink a `docker build` or `curl` log by **90%**.
 
 #### 3. Huge Single-Line / Minified Files & Base64 Blobs
-Suppose `ripgrep` searches for `"authToken"` and hits `public/assets/app.min.js` on line 1—a single line that is 1.8 megabytes long. Even if you cap `ripgrep` at 50 matching lines, **one line is 1.8 MB!**
-Similarly, HTML/JSON tool outputs frequently embed inline base64 images (`data:image/png;base64,iVBORw0KGgoAAA...` — 80,000 random-looking characters = ~40,000 tokens of pure noise).
+Suppose `ripgrep` searches for `"authToken"` and hits `public/assets/app.min.js` on line 1: a single line that is 1.8 megabytes long. Even if you cap `ripgrep` at 50 matching lines, **one line is 1.8 MB!**
+Similarly, HTML/JSON tool outputs frequently embed inline base64 images (`data:image/png;base64,iVBORw0KGgoAAA...`: 80,000 random-looking characters = ~40,000 tokens of pure noise).
 - **Fix:**
   - Enforce a **per-line character cap** (e.g., 500–2,000 characters per line): keep the first part (or match-centered window for `grep`), and append `... [line truncated: 1,842,100 chars total]`.
   - Collapse inline base64 data URIs above ~200 chars into `data:image/png;base64,<omitted 64,210 chars>`.
@@ -312,7 +312,7 @@ Offloading an output to `/tmp/agent-scratch/call_019_npm_test.log` only works if
 Design three ergonomics into your inspection tools:
 
 1. **Line-Numbered Range Reads (`read_file(path, start_line, end_line)`):**
-   When the model wants lines 1,400–1,500 of an offloaded log, it should be able to request that exact window—with a hard per-call budget (e.g., max 400–800 lines or 32–48 KB per read) and clear pagination feedback:
+   When the model wants lines 1,400–1,500 of an offloaded log, it should be able to request that exact window, with a hard per-call budget (e.g., max 400–800 lines or 32–48 KB per read) and clear pagination feedback:
    ```text
    Showing lines 1400-1500 of 4812 (use start_line=1501 to continue).
    ```
@@ -329,7 +329,7 @@ Design three ergonomics into your inspection tools:
 Across modern 2025–2026 coding agents, **truncation + scratch-file offloading** has converged into a universal standard pattern:
 
 - **Manus AI (Filesystem as Extended Context):** Manus routes heavy web crawls, search results, and dataset dumps straight to files in its sandbox VM (e.g., `search_results_001.txt`), returning only a lightweight receipt to the LLM (`"243 results saved to search_results_001.txt"`). The agent then uses shell tools, Python scripts, or targeted reads to extract just the rows it needs.
-- **Cursor (Dynamic Context Discovery):** Cursor turns long shell/tool responses *and* integrated terminal sessions directly into disk files rather than stuffing kilobytes of raw output into the prompt. When debugging a failed build, the agent inspects the terminal log file dynamically with `tail`, `grep`, or range reads—preventing both context rot and lossy silent truncation.
+- **Cursor (Dynamic Context Discovery):** Cursor turns long shell/tool responses *and* integrated terminal sessions directly into disk files rather than stuffing kilobytes of raw output into the prompt. When debugging a failed build, the agent inspects the terminal log file dynamically with `tail`, `grep`, or range reads, preventing both context rot and lossy silent truncation.
 - **LangChain Deep Agents (`deepagents`):** Ships built-in spill-to-file middleware that intercepts any tool result exceeding a configurable threshold (commonly ~20,000 tokens), writes the full content into its virtual filesystem, and replaces the message payload with a file path plus a short preview (such as the first 10 lines). The agent can then query the offloaded file using standard `read_file` and `grep` tools.
 - **Claude Code & MCP Hosts:** Enforces strict result size bounds (including host-level controls like `maxResultSizeChars` for MCP tools), automatically persists oversized tool outputs to temporary files on disk with explicit path pointers, truncates overly long individual lines, and pairs this with a line-numbered, paginated `Read` tool (`offset` + `limit`).
 - **OpenAI Codex CLI, Gemini CLI, and OpenCode:** All enforce dual byte and line caps (commonly in the 10–50 KB range) on shell and file tool outputs, combining head/tail slicing with clear omission markers so the model knows *how much* output was skipped rather than hallucinating over silently truncated text.
@@ -547,7 +547,7 @@ Notice how cleanly that works:
 ## 8. Key Takeaways & Quick Self-Check
 
 ### Key Takeaways
-- **Guard the front door:** A single unfiltered `cat`, `rg`, or `npm test` can overflow a 200k-token context window in one turn—before compaction ever runs.
+- **Guard the front door:** A single unfiltered `cat`, `rg`, or `npm test` can overflow a 200k-token context window in one turn, before compaction ever runs.
 - **Use asymmetric Head+Tail truncation and enforce BOTH line and byte/character caps:** Head captures startup context and the first root-cause error; tail captures final stack traces and test summaries; per-line and byte caps defeat minified single-line files.
 - **Offload instead of deleting:** Write full oversized outputs to a scratch file outside the Git working tree, and give the model a crisp preview, pinned exit code, file path, and `grep`/`read_file` instructions.
 - **Sanitize before measuring:** Detect binary files early, strip ANSI escape sequences, collapse `\r` progress-bar frames, and shrink embedded base64 blobs before counting tokens.
@@ -564,7 +564,7 @@ Notice how cleanly that works:
 2. **Why does asymmetric Head+Tail truncation (e.g., 25% head / 75% tail) beat both Head-Only and Tail-Only for shell commands?**
    <details>
    <summary>Show Answer</summary>
-   Head-Only keeps startup banners and passing tests while chopping off the failing assertion and test summary at the bottom. Tail-Only keeps the final summary while hiding the *first* root-cause error at the top (which matters hugely in compilers like TypeScript, Rust, or C++ where one early error spawns 100 cascading errors). Asymmetric Head+Tail preserves both ends—and always pin the exit code outside the truncated body.
+   Head-Only keeps startup banners and passing tests while chopping off the failing assertion and test summary at the bottom. Tail-Only keeps the final summary while hiding the *first* root-cause error at the top (which matters hugely in compilers like TypeScript, Rust, or C++ where one early error spawns 100 cascading errors). Asymmetric Head+Tail preserves both ends, and always pin the exit code outside the truncated body.
    </details>
 
 3. **Why should offloaded scratch artifacts be stored outside the repository's Git working directory?**
@@ -576,7 +576,7 @@ Notice how cleanly that works:
 4. **How do carriage-return (`\r`) progress bars waste thousands of tokens in raw captured stdout, and how do you fix them deterministically?**
    <details>
    <summary>Show Answer</summary>
-   On an interactive terminal, `\r` moves the cursor back to column 0 so each percentage update overwrites the previous one visually. When captured into a plain string, every intermediate frame (`1%\r2%\r3%...100%`) is stored sequentially. After normalizing `\r\n` to `\n`, split each line on `\r` and keep only the final non-empty frame—collapsing hundreds of progress frames into one clean line.
+   On an interactive terminal, `\r` moves the cursor back to column 0 so each percentage update overwrites the previous one visually. When captured into a plain string, every intermediate frame (`1%\r2%\r3%...100%`) is stored sequentially. After normalizing `\r\n` to `\n`, split each line on `\r` and keep only the final non-empty frame: collapsing hundreds of progress frames into one clean line.
    </details>
 
 ---

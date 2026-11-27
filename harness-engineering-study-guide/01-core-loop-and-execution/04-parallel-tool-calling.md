@@ -6,7 +6,7 @@
 
 In Chapters 01–03, you learned how to run a basic agent loop, stream the model's response as it arrives, and design crisp tool schemas. So far, we have imagined the model asking for **one** tool at a time: read a file, wait for the result, think again, read another file, wait again.
 
-Now imagine asking your coding agent to investigate a bug spread across six files. If the agent asks for one file per round trip to the Large Language Model (LLM), you wait through six separate network requests, six model inference passes, and six times the input token cost—just to read six files that were sitting quietly on your hard drive the whole time.
+Now imagine asking your coding agent to investigate a bug spread across six files. If the agent asks for one file per round trip to the Large Language Model (LLM), you wait through six separate network requests, six model inference passes, and six times the input token cost: just to read six files that were sitting quietly on your hard drive the whole time.
 
 Modern LLMs can request **multiple tool calls in a single turn**, and a well-engineered harness can execute safe ones **at the same time** (in parallel). Done well, parallel tool calling cuts latency in half and makes an agent feel snappy and decisive. Done carelessly, it corrupts files, scrambles conversation history, and leaves orphaned subprocesses running in the background.
 
@@ -26,15 +26,15 @@ Suppose the head chef hands over a single order ticket with five items on it:
 If the kitchen assistant handles this order **one item at a time**, walking back to the chef after every single check, dinner will take an hour.
 
 Instead, a sharp kitchen crew notices two completely different kinds of work on that ticket:
-- **Checks (Read-only work):** Items 1, 2, and 3 only *look* at things—they don't change the kitchen. Three helpers can check the fridge, the basil, and the oven **all at once** and report back together.
+- **Checks (Read-only work):** Items 1, 2, and 3 only *look* at things; they don't change the kitchen. Three helpers can check the fridge, the basil, and the oven **all at once** and report back together.
 - **Changes (Write / mutating work):** Item 5 (*toss the diced onions into the pan*) **depends on** Item 4 (*dice the onions*). You cannot run those simultaneously, or you will throw whole unpeeled onions into a cold pan while someone is still swinging a knife!
 
 **Parallel tool calling** in an agent harness is simply teaching your kitchen crew two rules:
 1. Accept a **single ticket with multiple requests** from the model (fan-out).
-2. Run **safe, read-only requests at the same time**, while running **state-changing requests in careful order**—and make sure every single request on the ticket gets a clearly labeled answer back.
+2. Run **safe, read-only requests at the same time**, while running **state-changing requests in careful order**: and make sure every single request on the ticket gets a clearly labeled answer back.
 
 ### What breaks if you don't handle this properly?
-- **No parallel execution at all:** Every multi-file search or read becomes a sluggish chain of sequential LLM calls—slow for the user and wasteful on prompt tokens.
+- **No parallel execution at all:** Every multi-file search or read becomes a sluggish chain of sequential LLM calls; slow for the user and wasteful on prompt tokens.
 - **Blindly running everything in parallel:** Two `edit_file` calls targeting the same file overwrite each other's changes; `create_file` races with `run_tests` and fails randomly; `rm` deletes a file another tool is reading.
 - **Sloppy result matching:** If one concurrent tool throws an exception and you forget to send back its error result, the LLM API rejects the entire next request with a protocol error, crashing the whole session.
 
@@ -42,7 +42,7 @@ Instead, a sharp kitchen crew notices two completely different kinds of work on 
 
 ## 2. Why This Matters in a Real Agent Harness
 
-Parallel tool calling is not a micro-optimization—it directly shapes the four pillars of an agent's user experience:
+Parallel tool calling is not a micro-optimization: it directly shapes the four pillars of an agent's user experience:
 
 | Dimension | Sequential (1 Tool per Turn) | Parallel Fan-Out (Multi-Tool Turn) | Real-World Impact |
 | :--- | :--- | :--- | :--- |
@@ -82,7 +82,7 @@ Notice how **Batch 2 acts as a barrier**: all reads in Batch 1 finish before `ed
 
 ### 4.1 Single-Turn Fan-Out: Multiple Tool Calls in One Assistant Message
 
-When an LLM supports parallel tool calling (all major 2025–2026 frontier models—Claude, GPT, Gemini—do by default), a single assistant response can contain **an array of tool requests** instead of just one.
+When an LLM supports parallel tool calling (all major 2025–2026 frontier models (Claude, GPT, Gemini) do by default), a single assistant response can contain **an array of tool requests** instead of just one.
 
 Here is what that looks like in the two most common API shapes:
 
@@ -142,13 +142,13 @@ Here is what that looks like in the two most common API shapes:
   ]
 }
 ```
-*(Note: OpenAI's newer **Responses API** represents parallel calls as separate top-level `function_call` output items matched by `call_id` rather than a nested `tool_calls` array—see [Chapter 01](./01-agent-tool-use-loop.md).)*
+*(Note: OpenAI's newer **Responses API** represents parallel calls as separate top-level `function_call` output items matched by `call_id` rather than a nested `tool_calls` array; see [Chapter 01](./01-agent-tool-use-loop.md).)*
 
-> **Plain-English check — What is "fan-out" and "fan-in"?**
+> **Plain-English check: What is "fan-out" and "fan-in"?**
 > **Fan-out** means taking one turn and splitting it into multiple concurrent worker tasks (like spreading out a hand of cards). **Fan-in** means waiting for all of those workers to finish and collecting their outputs back into a single ordered list before the next LLM call.
 
 #### Can you control whether the model emits parallel calls?
-Yes—and sometimes you *should* nudge or constrain it:
+Yes, and sometimes you *should* nudge or constrain it:
 - **System prompt guidance:** Tell the model explicitly: *"When you need to read multiple independent files or run independent searches, emit those tool calls in parallel in a single turn."* Frontier models respond well to this and dramatically cut wasted turns.
 - **Provider flags:** Some APIs expose parameters like `parallel_tool_calls: false` (OpenAI) or `disable_parallel_tool_use: true` (Anthropic) if you have a specialized workflow (such as strict step-by-step approval mode) where you want the model to emit only one tool call per turn.
 
@@ -181,7 +181,7 @@ It is tempting to label each tool statically as `read_only = True/False`. That g
 But what about `run_shell` or a generic `database_query` tool?
 - `run_shell("git status")` is **read-only and safe to parallelize**.
 - `run_shell("git checkout -b fix")` **mutates repository state** and must run serially.
-- `run_shell("pytest")` reads files, *might* write cache files (`.pytest_cache`), and consumes heavy CPU—usually safest to treat as **serial/mutating** unless proven otherwise.
+- `run_shell("pytest")` reads files, *might* write cache files (`.pytest_cache`), and consumes heavy CPU, usually safest to treat as **serial/mutating** unless proven otherwise.
 
 Therefore, production harnesses evaluate concurrency safety **per call** using a method like `isConcurrencySafe(toolInput)`:
 
@@ -236,7 +236,7 @@ Partition-Then-Gather slices this into **3 ordered batches**:
 #### Don't Forget a Concurrency Cap (Semaphore)!
 What if the model gets enthusiastic and emits **40 `read_file` or `web_fetch` calls** in a single turn? Launching 40 simultaneous network connections or `ripgrep` subprocesses can exhaust file descriptors (`EMFILE`), hit rate limits, or peg the user's CPU at 100%.
 
-Always bound parallel batches with a **semaphore** (a counter that limits how many tasks run at the exact same moment—typically **4 to 10 concurrent tools** for local workspace tools, or **3 to 5** for external HTTP/MCP calls).
+Always bound parallel batches with a **semaphore** (a counter that limits how many tasks run at the exact same moment, typically **4 to 10 concurrent tools** for local workspace tools, or **3 to 5** for external HTTP/MCP calls).
 
 ---
 
@@ -244,9 +244,9 @@ Always bound parallel batches with a **semaphore** (a counter that limits how ma
 
 Every LLM provider enforces a **strict structural contract** on tool calls:
 
-> **The 1-to-1 Contract:** If an assistant message contains $N$ tool calls with IDs `[id_1, id_2, ..., id_N]`, the immediately following tool-response turn **must** contain **exactly $N$ results** matching those exact IDs—no missing IDs, no duplicate IDs, and no extra unknown IDs.
+> **The 1-to-1 Contract:** If an assistant message contains $N$ tool calls with IDs `[id_1, id_2, ..., id_N]`, the immediately following tool-response turn **must** contain **exactly $N$ results** matching those exact IDs; no missing IDs, no duplicate IDs, and no extra unknown IDs.
 
-If you violate this contract—for example, call #2 throws an uncaught exception so you only send back results for call #1 and call #3—the API will reject your next request with an HTTP `400 Bad Request` error such as:
+If you violate this contract (for example, call #2 throws an uncaught exception so you only send back results for call #1 and call #3) the API will reject your next request with an HTTP `400 Bad Request` error such as:
 - Anthropic: `messages.3: tool_use ids were found without tool_result blocks immediately after: toolu_01B`
 - OpenAI: `An assistant message with 'tool_calls' must be followed by tool messages responding to each 'tool_call_id'.`
 
@@ -313,11 +313,11 @@ Notice that even skipped calls still get a matching `tool_result`! The 1-to-1 co
 
 ### 4.5 Cancellation and Timeout Propagation Across Concurrent Tool Calls
 
-Now think about what happens when things take too long—or the user hits **Ctrl+C** while four tools are running in parallel.
+Now think about what happens when things take too long, or the user hits **Ctrl+C** while four tools are running in parallel.
 
 There are **two distinct clocks** you must manage:
 1. **Per-tool timeout:** Each tool has its own sensible ceiling (e.g., `read_file`: 5 seconds; `grep`: 15 seconds; `run_shell`: 120 seconds). If one slow tool hangs, it times out with an error result while its fast siblings still succeed.
-2. **Turn / user cancellation (`AbortSignal` / `asyncio.CancelledError`):** If the user presses `Ctrl+C` (or hits the UI "Stop" button), the harness must immediately signal **every** in-flight tool in the batch to stop, kill any spawned child processes (like `ripgrep` or `pytest`), and still emit synthetic cancelled `tool_result` blocks (or roll back the dangling assistant turn cleanly—more on this in Chapter 06!).
+2. **Turn / user cancellation (`AbortSignal` / `asyncio.CancelledError`):** If the user presses `Ctrl+C` (or hits the UI "Stop" button), the harness must immediately signal **every** in-flight tool in the batch to stop, kill any spawned child processes (like `ripgrep` or `pytest`), and still emit synthetic cancelled `tool_result` blocks (or roll back the dangling assistant turn cleanly; more on this in Chapter 06!).
 
 #### Cooperative Cancellation Pattern (TypeScript `AbortSignal`)
 In Node.js / TypeScript, `AbortController` and `AbortSignal.any()` let you combine a **user-level abort signal** with a **per-tool timeout signal** cleanly:
@@ -386,7 +386,7 @@ Open-source and publicly documented coding agents have converged on remarkably c
 - **Claude Code (Anthropic):** Evaluates concurrency safety **per call** via an `isConcurrencySafe(input)` check on each tool rather than assuming all invocations of a tool are equal (for example, read-only shell inspections vs. mutating shell commands; malformed inputs fall back to `false`). It partitions the turn's tool calls left-to-right into contiguous batches: consecutive safe calls run in parallel, while unsafe calls run one at a time as serial barriers. Every `tool_use` ID is strictly matched to a `tool_result` block, with `is_error: true` returned for failures, timeouts, or skipped siblings.
 - **OpenAI Codex CLI (`codex-rs`):** Uses Rust's Tokio async runtime with a **Reader-Writer Lock (`tokio::sync::RwLock`)** paired with `FuturesOrdered`. Tools marked parallel-safe acquire a shared read lock and execute concurrently; mutating or approval-gated tools acquire an exclusive write lock, waiting for in-flight reads to drain before mutating the workspace. `FuturesOrdered` guarantees that even when tasks complete out of order, their results are emitted in the exact order the model requested them.
 - **Gemini CLI (`google-gemini/gemini-cli`):** Routes all function calls returned by a turn through `CoreToolScheduler`, which tracks an explicit `toolCallStatus` per call (`validating`, `awaiting_approval`, `scheduled`, `executing`, `success`, `error`, `cancelled`). This allows the terminal UI to render live per-tool status rows and spinners side-by-side while coordinating confirmation prompts cleanly without scrambling terminal input.
-- **Aider:** Historically chose a different trade-off for edits—applying structured search/replace blocks from a single text response sequentially in deterministic file order—showing that you only need true async concurrency when executing external I/O-bound tools (file reads, searches, web fetches, MCP servers).
+- **Aider:** Historically chose a different trade-off for edits, applying structured search/replace blocks from a single text response sequentially in deterministic file order, showing that you only need true async concurrency when executing external I/O-bound tools (file reads, searches, web fetches, MCP servers).
 
 ---
 
@@ -398,7 +398,7 @@ Open-source and publicly documented coding agents have converged on remarkably c
 
 2. **Streaming partial `tool_use` blocks before JSON arguments finish:**
    - *Symptom:* Trying to kick off a parallel tool the instant you see its name in a stream, before all its JSON argument deltas arrive, causes JSON parse failures or truncated paths.
-   - *Fix:* Wait until a tool block receives its `content_block_stop` (complete, validated JSON arguments) before dispatching it—or wait for the full turn to finish before partitioning batches. (Dispatching safe read tools as soon as each individual block finishes streaming is an advanced optimization, but only safe if you strictly use an `RwLock` so a later write block cannot overtake an earlier read!)
+   - *Fix:* Wait until a tool block receives its `content_block_stop` (complete, validated JSON arguments) before dispatching it, or wait for the full turn to finish before partitioning batches. (Dispatching safe read tools as soon as each individual block finishes streaming is an advanced optimization, but only safe if you strictly use an `RwLock` so a later write block cannot overtake an earlier read!)
 
 3. **Unbounded fan-out starving the machine:**
    - *Symptom:* Model requests 50 `grep` or MCP calls at once; the OS runs out of file descriptors or the remote API bans you with HTTP `429`.
@@ -410,7 +410,7 @@ Open-source and publicly documented coding agents have converged on remarkably c
 
 5. **Forgetting to sanitize/canonicalize paths in resource-keyed locks:**
    - *Symptom:* Call 1 edits `./src/app.ts` and Call 2 edits `src/../src/app.ts`. String comparison thinks they are different files and runs both writes concurrently!
-   - *Fix:* Resolve canonical paths (`os.path.realpath()` / `fs.realpathSync()`) if building per-file locks—or stick to simple partition-then-gather serialization for all writes.
+   - *Fix:* Resolve canonical paths (`os.path.realpath()` / `fs.realpathSync()`) if building per-file locks, or stick to simple partition-then-gather serialization for all writes.
 
 ---
 
@@ -585,7 +585,7 @@ if __name__ == "__main__":
 - **Parallel tool calling is a latency and token multiplier:** Batching independent read-only calls into one turn avoids repeated LLM round trips and redundant prompt reads.
 - **Classify safety per call, and fail closed:** Tools like `read_file` are always safe; tools like `run_shell` depend on the exact arguments. When in doubt, serialize.
 - **Partition reads vs. writes:** Use contiguous Partition-Then-Gather batching or a Reader-Writer lock (`RwLock`) so writes act as strict barriers and never race with reads or other writes.
-- **Respect the 1-to-1 ID contract religiously:** Every `tool_use_id` / `tool_call_id` from the assistant message **must** have a matching `tool_result`—even on exceptions, timeouts, cancellations, or skipped siblings—assembled in original call order.
+- **Respect the 1-to-1 ID contract religiously:** Every `tool_use_id` / `tool_call_id` from the assistant message **must** have a matching `tool_result` (even on exceptions, timeouts, cancellations, or skipped siblings) assembled in original call order.
 - **Bound concurrency and propagate cancellation:** Always put a semaphore cap on fan-out and wire `AbortSignal` / cancellation events all the way down to child subprocesses.
 
 ### Quick Self-Check

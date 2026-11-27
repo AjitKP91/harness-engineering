@@ -4,7 +4,7 @@
 
 # 09. Context Window Budgeting
 
-Suppose a model advertises a **200,000-token** or **1,000,000-token** context window. That sounds huge—like an infinite whiteboard! Surely you can just dump your codebase, tool logs, and chat history in and let the model sort it out?
+Suppose a model advertises a **200,000-token** or **1,000,000-token** context window. That sounds huge, like an infinite whiteboard! Surely you can just dump your codebase, tool logs, and chat history in and let the model sort it out?
 
 Not quite. In real agent harnesses, treating the context window as a bottomless landfill causes two disasters: **silent intelligence decay** (the model gets measurably dumber long before the window is full) and **hard runtime crashes** (the API rejects your turn with `400 Bad Request: prompt is too long`, or cuts off the agent's JSON tool call right in the middle of an edit).
 
@@ -20,12 +20,12 @@ Picture a chef working at a kitchen prep counter that is **10 feet wide**.
   1. **You need empty workspace to cook.** If 100% of the counter is covered with ingredients, there is zero room left to set down a cutting board and plate the meal! (In an LLM, that empty space is **output & thinking headroom**.)
   2. **Clutter causes mistakes.** Even when only 7 feet of the counter is piled with old pans from three dishes ago, the chef slows down, knocks things over, and accidentally grabs baking soda instead of flour. (In an LLM, that clutter-induced error rate is called **context rot**.)
 
-**Context Window Budgeting** is the discipline of dividing that 10-foot counter into dedicated zones—permanent tools, active recipe, recent prep notes, and guaranteed empty cooking space—and clearing clutter *before* the counter overflows.
+**Context Window Budgeting** is the discipline of dividing that 10-foot counter into dedicated zones (permanent tools, active recipe, recent prep notes, and guaranteed empty cooking space) and clearing clutter *before* the counter overflows.
 
 ### What Breaks Without It?
 
 - **Hard API failures:** One big `git diff` or `pytest` log pushes your prompt past the model's hard limit, crashing a 45-minute coding session with a `400 context_length_exceeded` error.
-- **Truncated tool calls:** If you fill 199,500 tokens of a 200,000-token window, the model only has 500 tokens left to think and write a file patch—so the API hits `stop_reason: "max_tokens"` halfway through a JSON object!
+- **Truncated tool calls:** If you fill 199,500 tokens of a 200,000-token window, the model only has 500 tokens left to think and write a file patch, so the API hits `stop_reason: "max_tokens"` halfway through a JSON object!
 - **Silent quality collapse:** Even without crashing, cramming 150k tokens of noisy logs into a 200k window degrades reasoning, causes hallucinated file paths, and makes the agent forget your original goal.
 
 ---
@@ -36,7 +36,7 @@ Every token you leave in the context window has a **triple tax**:
 
 1. **Accuracy Tax (Context Rot):** Irrelevant files, old stack traces, and dead-end explorations dilute the Transformer's attention away from the code that actually matters right now.
 2. **Latency Tax:** Even with prompt caching, larger KV caches require more GPU memory bandwidth to scan on every generated token, making streaming noticeably slower.
-3. **Cost Tax:** Even at a 90% cache discount, dragging 150,000 tokens of stale logs across 40 turns still costs real money—and if a cache TTL expires or compaction fails, you pay full price on all 150k tokens.
+3. **Cost Tax:** Even at a 90% cache discount, dragging 150,000 tokens of stale logs across 40 turns still costs real money, and if a cache TTL expires or compaction fails, you pay full price on all 150k tokens.
 
 Good budgeting gives your harness **predictable ceilings**: it knows *before* calling the API whether the request will fit with healthy headroom, and it triggers cleanup smoothly before quality degrades.
 
@@ -46,18 +46,15 @@ Good budgeting gives your harness **predictable ceilings**: it knows *before* ca
 
 Think of a **200,000-token** context window not as one flat bucket, but as a partitioned memory map with strict reservations and graduated pressure thresholds:
 
-```text
-200,000-Token Context Window (Total Hard Ceiling)
-+-----------------------------------------------------------------------------+
-| [System] | [Tools] | [Pinned] |       Conversation History       | Headroom |
-|   ~4k    |  ~12k   |   ~10k   |   (Grows across turns: 0..134k)  |  ~40k    |
-+-----------------------------------------------------------------------------+
-0          4k        16k        26k                  128k         160k       200k
-                                                      ^            ^
-                                                      |            |
-                                 Hard Compaction Trigger    Usable Input Cap
-                                 (80% of 160k usable)       (40k reserved for
-                                                            Thinking + Output!)
+<!-- visual:context-budget-bar -->
+```mermaid
+flowchart LR
+    subgraph Budget["200,000-Token Context Window (Total Hard Ceiling)"]
+        direction LR
+        Sys["System\n~4k (0–4k)"] --> Tools["Tools\n~12k (4k–16k)"] --> Pin["Pinned\n~10k (16k–26k)"] --> Hist["Conversation History\n0..134k (Compaction Trigger @ 128k)"]
+    end
+    Head["Output Headroom\n~40k Reserved (160k–200k)\nThinking + Output"]
+    Budget ---|"160k Usable Input Cap"| Head
 ```
 
 Before every LLM call, your harness runs a **Pre-Turn Budget Gate** to decide whether to send as-is, warn, prune stale tool outputs, or trigger full compaction (Chapter 10):
@@ -82,7 +79,7 @@ flowchart TD
 
 ### 4.1 Tokens vs. Characters vs. Words
 
-Beginners often assume *"1 word = 1 token"* or *"4 characters = 1 token"*. That rule of thumb works reasonably well for plain English prose—and fails **spectacularly** on the exact kinds of text coding agents deal with every day!
+Beginners often assume *"1 word = 1 token"* or *"4 characters = 1 token"*. That rule of thumb works reasonably well for plain English prose, and fails **spectacularly** on the exact kinds of text coding agents deal with every day!
 
 #### How Tokenizers Actually Work (BPE in Plain English)
 Modern LLMs use **subword tokenizers**, most commonly **Byte-Pair Encoding (BPE)**. During training, the tokenizer scans billions of pages of text and merges the most frequent byte pairs into a fixed vocabulary (typically 100,000 to 256,000 tokens).
@@ -99,7 +96,7 @@ Modern LLMs use **subword tokenizers**, most commonly **Byte-Pair Encoding (BPE)
 | **Clean Source Code** | `def verify_jwt(token: str) -> dict:` | ~3.0 – 3.5 chars / token | Symbols (`->`, `():`, `_`) and indentation add tokens. |
 | **JSON / Stack Traces / Logs** | `{"id":"9f8a2b","ok":true,"err":null}` | ~2.2 – 2.8 chars / token | Quotes, colons, braces, and random hex IDs explode token counts! |
 | **CJK / Non-Latin Text** | `"エージェントのコンテキスト管理"` | ~1.0 – 2.0 chars / token | Multi-byte UTF-8 characters can use 2x–3x more tokens per character than English. |
-| **Base64 / Minified Bundles** | `eyJhbGciOiJIUzI1NiIsInR5cCI6...` | ~1.2 – 1.8 chars / token | Random character sequences rarely match vocabulary merges—one tiny minified JS file can eat 40,000 tokens! |
+| **Base64 / Minified Bundles** | `eyJhbGciOiJIUzI1NiIsInR5cCI6...` | ~1.2 – 1.8 chars / token | Random character sequences rarely match vocabulary merges: one tiny minified JS file can eat 40,000 tokens! |
 
 #### Cross-Provider Tokenizer Mismatch
 Every model family ships its own vocabulary:
@@ -107,7 +104,7 @@ Every model family ships its own vocabulary:
 - **Anthropic Claude:** Proprietary BPE tokenizer (accessible via the free `POST /v1/messages/count_tokens` API).
 - **Google Gemini:** SentencePiece-based tokenizer (accessible via `countTokens` API and local SDK tokenizers).
 
-Because vocabularies differ, running OpenAI's `tiktoken` on text destined for Claude or Gemini can easily **under-count or over-count by 15%–25%**—and it completely misses hidden framing tokens (message role delimiters, tool schema serialization overhead, and image/PDF token grids).
+Because vocabularies differ, running OpenAI's `tiktoken` on text destined for Claude or Gemini can easily **under-count or over-count by 15%–25%**: and it completely misses hidden framing tokens (message role delimiters, tool schema serialization overhead, and image/PDF token grids).
 
 ---
 
@@ -124,13 +121,13 @@ Two landmark bodies of research explain why these numbers are not the same:
 Researchers discovered that LLMs exhibit a pronounced **U-shaped attention curve**:
 - Information at the **very beginning** of the prompt (system prompt, first messages) is recalled reliably (**primacy bias**).
 - Information at the **very end** of the prompt (most recent tool results, latest user request) is recalled reliably (**recency bias**).
-- Information buried in the **middle** of a long prompt suffers dramatic drops in recall and reasoning accuracy—even when the exact answer sits right there in plain text!
+- Information buried in the **middle** of a long prompt suffers dramatic drops in recall and reasoning accuracy, even when the exact answer sits right there in plain text!
 
 #### 2. Context Rot (Chroma Research, July 2025)
 In their widely cited technical report *"Context Rot: How Increasing Input Tokens Impacts LLM Performance"*, researchers at Chroma evaluated 18 frontier models (across Claude, GPT, Gemini, and Qwen families) on controlled tasks that went far beyond simple word-matching "Needle-in-a-Haystack" tests.
 
 Their findings reshaped how engineers design agent harnesses:
-- **Every single frontier model degrades as input length grows**—even on identical, simple tasks, and long before approaching the advertised token ceiling.
+- **Every single frontier model degrades as input length grows**: even on identical, simple tasks, and long before approaching the advertised token ceiling.
 - **Distractors hurt more than raw length:** Semantically similar but outdated text (like three earlier failed attempts at fixing a bug, or an older version of `auth.py` read 15 turns ago) actively confuses the model's attention!
 - **Performance degrades non-uniformly:** A model that passes 99% of simple exact-string lookups at 500k tokens can still stumble on multi-step logical reasoning or constraint tracking at 80k–120k tokens when surrounded by noisy tool logs.
 
@@ -156,7 +153,7 @@ Here is a battle-tested reference budget for a **200,000-token** frontier model 
 #### Don't Forget Thinking / Reasoning Tokens!
 This catches almost everyone building their first harness in 2025–2026: **reasoning models (like Claude with Extended Thinking, OpenAI o-series / reasoning effort, or Gemini Thinking models) spend their internal thinking tokens out of the `max_tokens` output budget!**
 
-If you reserve only 4,096 tokens for output on a hard refactoring task, the model can burn 4,000 tokens *thinking* about the architecture—and hit `max_tokens` after writing just 96 tokens of the actual patch! Reserve generous headroom (typically **16,384 to 32,768+ tokens**) for thinking + output on coding tasks, and subtract that full reserve from your usable input budget before calculating utilization.
+If you reserve only 4,096 tokens for output on a hard refactoring task, the model can burn 4,000 tokens *thinking* about the architecture, and hit `max_tokens` after writing just 96 tokens of the actual patch! Reserve generous headroom (typically **16,384 to 32,768+ tokens**) for thinking + output on coding tasks, and subtract that full reserve from your usable input budget before calculating utilization.
 
 ---
 
@@ -175,7 +172,7 @@ Don't call `count_tokens` over HTTP on every single turn (that adds 200ms of lat
 
 1. **Anchor on Ground Truth:** After every API response, read the provider's exact `usage` numbers. Now you know the *exact* token count of the entire conversation up to Turn $N$!
 2. **Estimate Only the Delta Locally:** Between Turn $N$ and Turn $N+1$, you only added a few tool results or one user message. Estimate *just those new bytes* locally using a conservative ratio (e.g., `chars / 3.0` for code/JSON, or `tiktoken` × `1.15` safety multiplier for non-OpenAI models).
-3. **Verify at the Boundary:** Only when `anchor_tokens + estimated_delta` crosses your high-pressure threshold (say, 80% of usable input) — or when multimodal images/PDFs are attached — optionally call the provider's exact `count_tokens` endpoint before deciding whether to trigger compaction.
+3. **Verify at the Boundary:** Only when `anchor_tokens + estimated_delta` crosses your high-pressure threshold (say, 80% of usable input), or when multimodal images/PDFs are attached, optionally call the provider's exact `count_tokens` endpoint before deciding whether to trigger compaction.
 
 #### Watch Out for Provider-Specific `usage` Formulas!
 This is one of the most frequent real-world bugs in multi-provider harnesses. Each provider reports total input tokens differently:
@@ -195,7 +192,7 @@ openai_total_input = usage.get("input_tokens") or usage["prompt_tokens"]
 gemini_total_input = usage_metadata["promptTokenCount"]
 ```
 
-If you forget to add `cache_read_input_tokens` on Anthropic, your harness will think a 180,000-token session is only using 400 tokens—right up until it slams head-first into a `400 prompt is too long` crash!
+If you forget to add `cache_read_input_tokens` on Anthropic, your harness will think a 180,000-token session is only using 400 tokens: right up until it slams head-first into a `400 prompt is too long` crash!
 
 ---
 
@@ -224,7 +221,7 @@ Suppose your usable input budget is 150,000 tokens and your Red threshold is 85%
 - **Claude Code:** Continuously tracks authoritative input token usage by summing `input_tokens + cache_creation_input_tokens + cache_read_input_tokens` from Anthropic's response metadata. It reserves dedicated output/thinking headroom, exposes a `/context` breakdown showing exactly how many tokens are spent on system prompt, tools, MCP servers, `CLAUDE.md`, and conversation messages, and automatically triggers compaction well before hitting the model's hard ceiling (preserving a clean safety buffer).
 - **OpenAI Codex CLI:** Configures model-specific context window ceilings and auto-compaction thresholds (using `usage` telemetry from the Responses API), reserving space for reasoning and output generation while keeping tool schemas and project instructions (`AGENTS.md`) capped at predictable byte limits.
 - **Aider:** Takes an explicit, transparent partitioning approach: users can inspect `/tokens` to see the exact split between system prompt, **repo-map** (bounded by `--map-tokens`, typically 1k–4k tokens), explicitly added editable files, and chat history (bounded by `max_chat_history_tokens`, triggering background summarization when exceeded).
-- **Gemini CLI:** Even though Gemini models offer massive 1,000,000-token windows, production Gemini harnesses still apply sensible budget warnings and optional history compression—recognizing that *cost, latency, and context rot* make running lean far superior to dumping 800k tokens of unpruned terminal logs.
+- **Gemini CLI:** Even though Gemini models offer massive 1,000,000-token windows, production Gemini harnesses still apply sensible budget warnings and optional history compression; recognizing that *cost, latency, and context rot* make running lean far superior to dumping 800k tokens of unpruned terminal logs.
 
 ---
 
@@ -235,7 +232,7 @@ Suppose your usable input budget is 150,000 tokens and your Red threshold is 85%
 | **Forgetting Anthropic's Split Usage Fields** | Harness reads only `usage.input_tokens` (say, 120 tokens), thinks context is empty, and crashes at 200k tokens. | Always normalize provider usage through one helper that sums `input_tokens + cache_creation_input_tokens + cache_read_input_tokens` for Anthropic. |
 | **Ignoring Output & Thinking Headroom** | Sending 195k input tokens to a 200k model with `max_tokens=16384`. Either the API immediately rejects with `400`, or the model runs out of tokens mid-patch! | Define `usable_input_budget = context_window - reserved_output_and_thinking - safety_margin` and measure utilization against `usable_input_budget`, never the raw window! |
 | **Unbounded MCP Tool Schema Bloat** | User enables 8 MCP servers with 180 tools. Before the user types a single word, 65,000 tokens (40% of usable input!) are already gone. | Measure and budget tool schemas explicitly; warn the user when tool schemas exceed ~15–20% of usable input, and use deferred tool loading (Chapter 12 & 19). |
-| **Using `len(text) / 4` Without Margin on Code/JSON** | A massive minified JSON API response is 80,000 characters. `80000 / 4 = 20k` estimated tokens—actual count is **38,000 tokens**, blowing past the limit! | Use a conservative divisor (`chars / 2.5` or `chars / 3.0`) for code/JSON deltas, cap individual tool outputs (Chapter 11), and keep an explicit safety margin. |
+| **Using `len(text) / 4` Without Margin on Code/JSON** | A massive minified JSON API response is 80,000 characters. `80000 / 4 = 20k` estimated tokens: actual count is **38,000 tokens**, blowing past the limit! | Use a conservative divisor (`chars / 2.5` or `chars / 3.0`) for code/JSON deltas, cap individual tool outputs (Chapter 11), and keep an explicit safety margin. |
 | **Treating a 1M Window as Rot-Free** | Harness sets compaction trigger at 900,000 tokens on a 1M model. By 250,000 tokens, the agent is slow, expensive, and hallucinating variable names. | Set an **effective working ceiling** (for example, 150k–250k tokens for routine coding loops) even on 1M-token models, reserving the upper range only for deliberate massive-read tasks. |
 
 ---
@@ -456,25 +453,25 @@ if __name__ == "__main__":
 1. **Your agent uses a 200,000-token Claude model. After Turn 22, Anthropic returns `usage = {"input_tokens": 150, "cache_creation_input_tokens": 4200, "cache_read_input_tokens": 148000, "output_tokens": 2100}`. How many input tokens will Turn 23 start with (before adding Turn 23's new user/tool message)?**
    <details>
    <summary>Show Answer</summary>
-   Turn 22's total input was <code>150 + 4,200 + 148,000 = 152,350</code> tokens. Adding Turn 22's assistant reply (<code>2,100</code> tokens, which becomes part of the conversation history sent on Turn 23) means Turn 23 starts at <strong>154,450 tokens</strong>—well into the high-pressure zone once you account for output/thinking headroom!
+   Turn 22's total input was <code>150 + 4,200 + 148,000 = 152,350</code> tokens. Adding Turn 22's assistant reply (<code>2,100</code> tokens, which becomes part of the conversation history sent on Turn 23) means Turn 23 starts at <strong>154,450 tokens</strong>: well into the high-pressure zone once you account for output/thinking headroom!
    </details>
 
 2. **Why does a model with a 1,000,000-token advertised context window still benefit from Context Window Budgeting and compaction around 150k–250k tokens during coding loops?**
    <details>
    <summary>Show Answer</summary>
-   Three reasons: (1) <strong>Context Rot & Lost in the Middle</strong>—reasoning accuracy and instruction-following measurably decline as irrelevant logs and outdated file reads pile up; (2) <strong>Latency</strong>—scanning a huge KV cache slows token generation; and (3) <strong>Cost</strong>—even with a 90% cache discount, carrying 600k tokens across dozens of turns multiplies API spend unnecessarily.
+   Three reasons: (1) <strong>Context Rot & Lost in the Middle</strong> (reasoning accuracy and instruction-following measurably decline as irrelevant logs and outdated file reads pile up; (2) <strong>Latency</strong>) scanning a huge KV cache slows token generation; and (3) <strong>Cost</strong>, even with a 90% cache discount, carrying 600k tokens across dozens of turns multiplies API spend unnecessarily.
    </details>
 
 3. **You build an agent with extended thinking enabled (`thinking_budget = 16,384` and `max_output = 16,384`) on a 200,000-token model, and you set your compaction trigger to 190,000 input tokens. What goes wrong?**
    <details>
    <summary>Show Answer</summary>
-   The model needs up to 32,768 tokens of output/thinking headroom, so <code>190,000 + 32,768 = 222,768</code> exceeds the 200,000 hard limit! The API will reject the call with a <code>400</code> error—or if you clamp <code>max_tokens</code> down to 10,000, the model will spend all 10,000 tokens thinking and truncate its actual code edit mid-JSON. Always subtract output + thinking + safety reserves <em>first</em> to find your usable input budget (~159,000 tokens), and trigger compaction at ~85% of <em>that</em> (~135,000 tokens).
+   The model needs up to 32,768 tokens of output/thinking headroom, so <code>190,000 + 32,768 = 222,768</code> exceeds the 200,000 hard limit! The API will reject the call with a <code>400</code> error, or if you clamp <code>max_tokens</code> down to 10,000, the model will spend all 10,000 tokens thinking and truncate its actual code edit mid-JSON. Always subtract output + thinking + safety reserves <em>first</em> to find your usable input budget (~159,000 tokens), and trigger compaction at ~85% of <em>that</em> (~135,000 tokens).
    </details>
 
 4. **Why is "anchoring on last turn's API `usage` + local delta estimation" usually better than calling `POST /v1/messages/count_tokens` on every single turn?**
    <details>
    <summary>Show Answer</summary>
-   Calling <code>count_tokens</code> on every turn adds an extra network round-trip (100–400 ms latency) and burns API rate limits on every single step. Anchoring on the previous turn's exact <code>usage</code> response is 100% accurate and completely free (0 ms), leaving only the tiny new delta to estimate offline—and you can still invoke <code>count_tokens</code> selectively when crossing a high threshold or attaching images/PDFs.
+   Calling <code>count_tokens</code> on every turn adds an extra network round-trip (100–400 ms latency) and burns API rate limits on every single step. Anchoring on the previous turn's exact <code>usage</code> response is 100% accurate and completely free (0 ms), leaving only the tiny new delta to estimate offline, and you can still invoke <code>count_tokens</code> selectively when crossing a high threshold or attaching images/PDFs.
    </details>
 
 ---

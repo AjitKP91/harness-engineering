@@ -4,9 +4,9 @@
 
 # 37. Transcript Logging & Deterministic Replay
 
-Imagine a user files a bug report: *"Your coding agent got stuck in a loop for 4 minutes, burned \$3.50 in tokens, and then deleted my config file."* You ask them to reproduce it. They run the exact same prompt again—and this time the agent solves the task cleanly in 12 seconds!
+Imagine a user files a bug report: *"Your coding agent got stuck in a loop for 4 minutes, burned \$3.50 in tokens, and then deleted my config file."* You ask them to reproduce it. They run the exact same prompt again, and this time the agent solves the task cleanly in 12 seconds!
 
-Welcome to the most frustrating reality of AI engineering: **LLMs are probabilistic, and real developer workspaces constantly change.** If you rely on "try to reproduce it live," you will almost never catch subtle harness bugs—like a malformed streaming delta, a broken tool-result truncation rule, or an edge case in context compaction.
+Welcome to the most frustrating reality of AI engineering: **LLMs are probabilistic, and real developer workspaces constantly change.** If you rely on "try to reproduce it live," you will almost never catch subtle harness bugs, like a malformed streaming delta, a broken tool-result truncation rule, or an edge case in context compaction.
 
 The antidote is an **aviation black box** built into your harness: an **append-only JSONL transcript** that records every single event of a session, paired with a **deterministic replay engine** that lets you re-run your harness code offline, millisecond by millisecond, with zero API calls and 100% repeatability.
 
@@ -17,23 +17,23 @@ The antidote is an **aviation black box** built into your harness: an **append-o
 Think of an **airplane's flight data recorder** (the "black box") combined with a **chess game score sheet**.
 
 - While the plane is flying, the recorder doesn't overwrite a summary file saying *"flight seems fine."* Every fraction of a second, it appends one new immutable line: altitude, speed, pilot stick input, engine temperature. Even if the plane loses power mid-flight, every line written up to the final millisecond survives intact.
-- Later, investigators can feed that exact recording into a ground simulator to replay the instruments and test whether a firmware fix would have prevented the stall—without ever risking a real airplane.
+- Later, investigators can feed that exact recording into a ground simulator to replay the instruments and test whether a firmware fix would have prevented the stall, without ever risking a real airplane.
 
 In an agent harness, an **append-only JSONL transcript** is that flight recorder.
 
 **What breaks if you don't have it?**
 1. **Un-debuggable ghost bugs:** When a user says *"compaction dropped my instructions at turn 28,"* you have no way to see the exact prompt, tool outputs, or timings that caused it.
-2. **Crash corruption:** If you store a session as one giant `session.json` file and overwrite it on every turn, a crash or `Ctrl+C` halfway through writing corrupts the entire JSON file—destroying the user's session.
+2. **Crash corruption:** If you store a session as one giant `session.json` file and overwrite it on every turn, a crash or `Ctrl+C` halfway through writing corrupts the entire JSON file; destroying the user's session.
 3. **Slow, expensive, flaky tests:** Testing your harness loop against live LLM APIs costs real money, takes minutes in CI, and fails randomly whenever the model picks a slightly different phrasing.
 
 ---
 
 ## 2. Why This Matters in a Real Agent Harness
 
-A well-designed transcript is not "just debug logging"—it becomes the **single source of truth** powering five core features of a production harness:
+A well-designed transcript is not "just debug logging": it becomes the **single source of truth** powering five core features of a production harness:
 
 - **Crash-proof session resume:** Because every event is flushed to disk as soon as it happens, killing the terminal and running `--resume` simply replays the JSONL file to reconstruct the exact in-memory state *(Ch. 06)*.
-- **Branching & Rewind (`/rewind`):** Instead of deleting history when a user rolls back *(Ch. 36)*, each event carries a `uuid` and `parent_uuid`. Rewinding simply creates a new child branch from an earlier `uuid`—preserving full audit history while cleanly updating the active conversation!
+- **Branching & Rewind (`/rewind`):** Instead of deleting history when a user rolls back *(Ch. 36)*, each event carries a `uuid` and `parent_uuid`. Rewinding simply creates a new child branch from an earlier `uuid`: preserving full audit history while cleanly updating the active conversation!
 - **Deterministic bug reproduction:** You can take a real failing user transcript, drop it into a unit test, stub out the LLM and tools from the recording, and reproduce a parser or state-machine bug in **10 milliseconds** offline.
 - **Post-hoc security & cost audits:** Security teams can scan JSONL transcripts to verify whether a permission policy blocked dangerous shell commands, and product teams can analyze where agents get stuck.
 - **UI decoupling & time-travel viewers:** TUI, web dashboards, and shareable HTML replay viewers can all read the exact same JSONL file format.
@@ -60,30 +60,35 @@ flowchart LR
 
 ### 4.1 Append-Only JSONL Event Logs as the Single Source of Truth
 
-**JSONL** stands for **JSON Lines** (also called NDJSON—Newline-Delimited JSON). Instead of wrapping a whole file in `[ ... ]` with commas between items, **each line is one complete, independent JSON object terminated by `\n`**.
+**JSONL** stands for **JSON Lines** (also called NDJSON: Newline-Delimited JSON). Instead of wrapping a whole file in `[ ... ]` with commas between items, **each line is one complete, independent JSON object terminated by `\n`**.
 
 Why JSONL beats a single `session.json` or heavy SQLite database for session transcripts:
 
 | Property | Single `session.json` | Append-Only `.jsonl` | Embedded DB (SQLite) |
 | :--- | :--- | :--- | :--- |
-| **Write cost per event** | $O(N)$ — rewrites whole file | **$O(1)$ — appends 1 line** | $O(\log N)$ |
+| **Write cost per event** | $O(N)$: rewrites whole file | **$O(1)$: appends 1 line** | $O(\log N)$ |
 | **Crash mid-write** | Corrupts entire file | **Only last incomplete line affected; ignore & recover!** | Safe (WAL mode) |
 | **Streaming reads** | Must load whole file in RAM | **Read line-by-line with constant memory** | Requires SQL queries |
 | **CLI inspectability** | Needs full parse | **Works natively with `jq`, `rg`, `tail -f`, `wc -l`** | Needs `sqlite3` CLI |
 | **Concurrency / tailing** | Readers see partial files | **Live UI / watcher can `tail -f` cleanly** | Lock contention possible |
 
-> **Pro tip on durability:** Open the file in append mode (`"a"`), write the entire serialized line plus `\n` in a single write call, and flush. On load, if the very last line fails `json.loads()` because power died mid-write, log a warning and safely discard only that trailing partial line—every previous turn remains 100% intact!
+> **Pro tip on durability:** Open the file in append mode (`"a"`), write the entire serialized line plus `\n` in a single write call, and flush. On load, if the very last line fails `json.loads()` because power died mid-write, log a warning and safely discard only that trailing partial line: every previous turn remains 100% intact!
 
 #### Tree-Structured Events (`uuid` + `parent_uuid`)
 Notice a clever trick used by modern harnesses: even though the file on disk is a flat append-only list of lines, each event stores its own `uuid` and `parent_uuid`.
 
-```text
-  e1 (user: "Fix login")
-   └── e2 (assistant: tool_use read_file)
-        └── e3 (tool_result: auth.py)
-             ├── e4 (assistant: bad fix)          <-- abandoned after /rewind
-             └── e5 (user: "Use JWT instead")     <-- new active branch (parent_uuid = e3)
-                  └── e6 (assistant: good fix)
+```mermaid
+flowchart LR
+    e1["e1 (user: 'Fix login')"]
+    e2["e2 (assistant: tool_use read_file)"]
+    e3["e3 (tool_result: auth.py)"]
+    e4["e4 (assistant: bad fix · abandoned after /rewind)"]
+    e5["e5 (user: 'Use JWT instead' · parent_uuid = e3)"]
+    e6["e6 (assistant: good fix)"]
+
+    e1 --> e2 --> e3
+    e3 -.->|"abandoned branch"| e4
+    e3 -->|"active branch"| e5 --> e6
 ```
 
 Because you **never overwrite or delete lines**, the file stays strictly append-only (fast, crash-safe, auditable), while following `parent_uuid` pointers from the latest active leaf gives you the exact active conversation thread!
@@ -104,9 +109,9 @@ A transcript is only as useful as the **schema discipline** of its events. Every
 
 Notice what makes this schema gold for debugging:
 - **Monotonic `seq` + ISO-8601 UTC `ts`:** Unambiguous ordering even when two parallel tool calls finish in the same millisecond.
-- **Environment fingerprint in `session_start`:** Model ID, harness version, OS, `cwd`, and `git_head`—critical when comparing regressions across versions.
+- **Environment fingerprint in `session_start`:** Model ID, harness version, OS, `cwd`, and `git_head`; critical when comparing regressions across versions.
 - **Exact timings (`ttft_ms`, `duration_ms`):** Lets you immediately tell whether a 12-second turn was slow because of the LLM or because `pytest` took 10 seconds.
-- **Error events are first-class:** Never swallow HTTP 429s, retries, permission denials, or compaction triggers silently—log them as explicit events so you see the full story.
+- **Error events are first-class:** Never swallow HTTP 429s, retries, permission denials, or compaction triggers silently; log them as explicit events so you see the full story.
 - **`schema_version`:** Include `"v": 1` in `session_start` so future parsers handle evolving formats gracefully without crashing on old logs.
 
 ---
@@ -119,7 +124,7 @@ Here is a classic mistake: an agent runs `cat huge_bundle.js` or a verbose test 
 - Opening it in `jq` or loading it on `--resume` stalls for seconds.
 - Sending the log in a bug report is impossible.
 
-The clean solution is **Two-Tier Logging (Compact Transcript + Content-Addressed Blob Store)**—the exact same principle behind artifact offloading *(Ch. 11)*:
+The clean solution is **Two-Tier Logging (Compact Transcript + Content-Addressed Blob Store)**: the exact same principle behind artifact offloading *(Ch. 11)*:
 
 ```text
 ~/.myagent/sessions/sess_8f2a/
@@ -134,7 +139,7 @@ When a tool result or payload exceeds a threshold (say, **16 KB or 32 KB**):
 2. In `transcript.jsonl`, store a compact record containing:
    - `truncated`: `true`
    - `byte_size`: `2148920`
-   - `preview_head` and `preview_tail` (e.g., first 2 KB + last 2 KB—preserving error stack traces at the end!)
+   - `preview_head` and `preview_tail` (e.g., first 2 KB + last 2 KB: preserving error stack traces at the end!)
    - `blob_ref`: `"blobs/9f86d081.txt"`
 
 | Log Mode | What It Contains | Typical Size (50 turns) | Best Used For |
@@ -150,7 +155,7 @@ When a tool result or payload exceeds a threshold (say, **16 KB or 32 KB**):
 
 Now for the superpower that makes transcript logging pay off tenfold: **VCR-style deterministic replay**.
 
-*(The name **VCR** comes from old video cassette recorders—a classic testing pattern pioneered by Ruby's `vcr` library and Python's `pytest-recording` that records external network calls once to a "cassette" file and replays them offline in tests.)*
+*(The name **VCR** comes from old video cassette recorders: a classic testing pattern pioneered by Ruby's `vcr` library and Python's `pytest-recording` that records external network calls once to a "cassette" file and replays them offline in tests.)*
 
 In an agent harness, you have **two** sources of non-determinism:
 1. **The LLM Provider** (stochastic token generation, streaming chunk boundaries, rate limits)
@@ -162,7 +167,7 @@ By placing clean interfaces (`LLMClient` and `ToolExecutor`) between your agent 
 | :--- | :--- | :--- | :--- |
 | **1. Full Hermetic Replay** | Recorded from JSONL | Recorded from JSONL | Harness logic: streaming parser, state machine, compaction triggers, UI renderer, cost math, loop detector. Runs in **< 20 ms**, \$0 cost! |
 | **2. Mock-LLM + Live Tools** | Recorded from JSONL | Real tools in temp sandbox | Verifies that your real `edit_file`, `ripgrep`, sandbox rules, and checkpoint rollback still work on a real sequence of model tool calls. |
-| **3. Live LLM + Mock Tools (Cassette)** | Real LLM API | Recorded tool responses | Tests whether a **new prompt or newer model** makes better decisions when handed the exact same historical tool outputs—without needing a fragile live database or repo setup. |
+| **3. Live LLM + Mock Tools (Cassette)** | Real LLM API | Recorded tool responses | Tests whether a **new prompt or newer model** makes better decisions when handed the exact same historical tool outputs, without needing a fragile live database or repo setup. |
 
 #### Handling Drift in Replay Matching
 What if you refactor your system prompt slightly and then run Mode 1 (Full Hermetic Replay)? If your mock LLM matches requests by *exact raw byte hash* of the entire prompt, the test breaks on every minor wording tweak!
@@ -181,7 +186,7 @@ An agent transcript is a **security goldmine** if left unprotected. Think about 
 - The agent reads a `.env` file, AWS credentials, or a database connection string (`postgres://admin:SuperSecret@prod...`)
 - A test fixture dumps customer emails, phone numbers, or session cookies
 
-Cross-referencing *Ch. 25 (Secret & Credential Isolation)*, you must **redact BEFORE writing to disk**—never rely on "we'll scrub it later before uploading."
+Cross-referencing *Ch. 25 (Secret & Credential Isolation)*, you must **redact BEFORE writing to disk**: never rely on "we'll scrub it later before uploading."
 
 #### Layered Redaction Pipeline
 1. **Known-value scrubbing:** At session start, take the values of sensitive environment variables (anything matching `*_KEY`, `*_TOKEN`, `*_SECRET`, `*_PASSWORD`, `DATABASE_URL` with length $\ge 8$) and register them as exact-match literals to replace with `[REDACTED:ENV:<NAME>]`.
@@ -194,7 +199,7 @@ Cross-referencing *Ch. 25 (Secret & Credential Isolation)*, you must **redact BE
 4. **Retention & Right-to-Delete:**
    - Set a sane default TTL (e.g., **30 days**), with automatic background sweeping of expired `.jsonl` files and orphaned blobs.
    - Support an **ephemeral / zero-persistence mode** (`--no-persist` or `HARNESS_EPHEMERAL=1`) for regulated environments or sensitive incident response where nothing should touch disk.
-   - Provide an explicit CLI command (`myagent sessions purge`) so users can wipe a session—and all its linked blobs and checkpoints—completely.
+   - Provide an explicit CLI command (`myagent sessions purge`) so users can wipe a session, and all its linked blobs and checkpoints, completely.
 
 ---
 
@@ -202,7 +207,7 @@ Cross-referencing *Ch. 25 (Secret & Credential Isolation)*, you must **redact BE
 
 - **Claude Code (`~/.claude/projects/<encoded-path>/<session-id>.jsonl`):** Records every session as an append-only JSONL file scoped by an encoded workspace path. Each line carries `uuid`, `parentUuid`, `timestamp`, `sessionId`, `cwd`, and a `type` discriminator (`user`, `assistant`, `system`, etc.), with `tool_use` and `tool_result` blocks faithfully preserved. Because events link via `parentUuid`, branching after `/rewind` and resuming sessions (`claude --resume`) work cleanly off the same log. Community tools like `claude-replay` parse these exact JSONL files into interactive step-by-step HTML timelines.
 - **OpenAI Codex CLI (`~/.codex/sessions/YYYY/MM/DD/rollout-<timestamp>-<id>.jsonl`):** Automatically writes date-sharded append-only JSONL "rollout" files (and supports zstd-compressed archives `.jsonl.zst`). Each line wraps `{timestamp, type, payload}` using structured record families like `session_meta`, `turn_context`, `response_item`, and `event_msg` (capturing token counts, shell outputs, `apply_patch` diffs, and plan updates). Developers routinely pipe these files into `jq` or Python replay scripts.
-- **SWE-agent & Harbor / OpenHands Trajectories:** Save structured `.traj` / JSONL trajectory logs capturing every thought, action, observation, exit status, and latency metric—allowing researchers to replay and inspect thousands of benchmark runs offline without re-running expensive containers.
+- **SWE-agent & Harbor / OpenHands Trajectories:** Save structured `.traj` / JSONL trajectory logs capturing every thought, action, observation, exit status, and latency metric, allowing researchers to replay and inspect thousands of benchmark runs offline without re-running expensive containers.
 - **Playwright Trace Viewer & VCR Testing Ecosystems:** Inspired the two-tier pattern (lightweight JSONL event timeline + content-addressed blob directory for screenshots and large DOM/stdout captures), keeping timelines snappy while preserving full fidelity on demand.
 
 ---
@@ -211,7 +216,7 @@ Cross-referencing *Ch. 25 (Secret & Credential Isolation)*, you must **redact BE
 
 1. **Redacting *after* writing to disk (or forgetting tool *inputs*):**
    *What happens:* You redact `tool_result` outputs, but forget that the agent passed `curl -H "Authorization: Bearer secret123"` inside `tool_use.input`. The secret still lands in plaintext in `transcript.jsonl`.
-   *Fix:* Pass **every** event payload—user messages, LLM text, tool inputs, tool outputs, and error messages—through the redactor immediately before serialization.
+   *Fix:* Pass **every** event payload (user messages, LLM text, tool inputs, tool outputs, and error messages) through the redactor immediately before serialization.
 2. **Corrupting JSONL with unbuffered concurrent writes:**
    *What happens:* Parallel tool calls *(Ch. 04)* finish on two async tasks or threads at the exact same instant and interleave bytes onto the same line, producing mangled JSON.
    *Fix:* Funnel all transcript writes through a single synchronized writer (a mutex/lock or a single dedicated async writer queue) and serialize the entire JSON line + `\n` into one string buffer before calling `write()`.
@@ -222,7 +227,7 @@ Cross-referencing *Ch. 25 (Secret & Credential Isolation)*, you must **redact BE
    *What happens:* Your replay test hashes the full system prompt including today's date (`"Today is 2026-04-12"`). Tomorrow, every replay test in CI fails.
    *Fix:* Inject a deterministic fake clock in tests, normalize paths/dates before matching, and prefer structural matching (`tool_name` + canonical args) over brittle full-prompt byte equality.
 5. **Orphaned blobs after deleting a `.jsonl` file:**
-   *What happens:* Your retention job deletes old `transcript.jsonl` files after 30 days, but forgets to clean up `blobs/`—quietly filling 10 GB of disk over a year.
+   *What happens:* Your retention job deletes old `transcript.jsonl` files after 30 days, but forgets to clean up `blobs/`; quietly filling 10 GB of disk over a year.
    *Fix:* Either scope `blobs/` inside each session's own folder (`sessions/<session_id>/blobs/`) so deleting the session folder removes everything atomically, or run reference-counted garbage collection across shared blobs.
 
 ---
@@ -418,7 +423,7 @@ class DeterministicReplayHarness:
         return out["inline"] if isinstance(out, dict) else str(out)
 ```
 
-With this ~140-line module, any real production failure can be scrubbed, saved into `tests/fixtures/bug_412/`, and replayed in `pytest` forever—with zero API cost and zero flakiness.
+With this ~140-line module, any real production failure can be scrubbed, saved into `tests/fixtures/bug_412/`, and replayed in `pytest` forever, with zero API cost and zero flakiness.
 
 ---
 
@@ -434,7 +439,7 @@ With this ~140-line module, any real production failure can be scrubbed, saved i
 
 1. **Why is an append-only `.jsonl` file significantly safer than periodically overwriting a single `session.json` file?**
    <details><summary>Show Answer</summary>
-   Overwriting a single `session.json` rewrites the whole file ($O(N)$) on every turn; if the process crashes or is killed mid-write, the entire JSON document becomes invalid and unparseable. With append-only `.jsonl`, each event is one independent line appended in $O(1)$ time—so a mid-write crash can only corrupt the single trailing line, which the loader can safely discard while preserving all earlier turns.
+   Overwriting a single `session.json` rewrites the whole file ($O(N)$) on every turn; if the process crashes or is killed mid-write, the entire JSON document becomes invalid and unparseable. With append-only `.jsonl`, each event is one independent line appended in $O(1)$ time, so a mid-write crash can only corrupt the single trailing line, which the loader can safely discard while preserving all earlier turns.
    </details>
 
 2. **How does a harness support `/rewind` (rolling back 5 turns and trying a different path) while keeping its transcript strictly append-only?**
@@ -449,7 +454,7 @@ With this ~140-line module, any real production failure can be scrubbed, saved i
 
 4. **A harness redacts `tool_result` outputs before writing to `transcript.jsonl`, yet an API key still leaked into the log. What are two likely places it came from?**
    <details><summary>Show Answer</summary>
-   (1) **Tool inputs** (`tool_use.input`), such as a shell command containing `curl -H "Authorization: Bearer ..."` or an inline secret in `write_file`; and (2) **user prompts or error messages** (e.g., an HTTP exception trace echoing auth headers). The redactor must run over the *entire* event payload—not just tool outputs—before serialization.
+   (1) **Tool inputs** (`tool_use.input`), such as a shell command containing `curl -H "Authorization: Bearer ..."` or an inline secret in `write_file`; and (2) **user prompts or error messages** (e.g., an HTTP exception trace echoing auth headers). The redactor must run over the *entire* event payload, not just tool outputs, before serialization.
    </details>
 
 ---

@@ -27,7 +27,7 @@ export function renderHomeView(root: HTMLElement, manifest: ManifestData): () =>
             Understand how modern AI coding agents <em>actually work</em>.
           </h1>
           <p class="hero-subtitle">
-            An interactive, beginner-friendly textbook exploring the software wrapped around language models—from streaming tool loops and KV prompt caches to OS sandboxes, subagent swarms, and evaluation benchmarks.
+            An interactive, beginner-friendly textbook exploring the software wrapped around language models, from streaming tool loops and KV prompt caches to OS sandboxes, subagent swarms, and evaluation benchmarks.
           </p>
           <div class="formula-banner" aria-label="Core formula">
             <span class="formula-pill">AI Agent</span>
@@ -67,7 +67,7 @@ export function renderHomeView(root: HTMLElement, manifest: ManifestData): () =>
         <div class="section-header">
           <div>
             <h2 id="paths-heading" class="section-title">Choose a Reading Path</h2>
-            <p class="section-subtitle">Click a path to highlight its chapters below—or read straight through from Module 0 to Module 7.</p>
+            <p class="section-subtitle">Click a path to highlight its chapters below, or read straight through from Module 0 to Module 7.</p>
           </div>
           <button type="button" class="btn-ghost btn-sm" id="clear-path-btn" style="display:none;">Show All Chapters</button>
         </div>

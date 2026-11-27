@@ -6,7 +6,7 @@
 
 When a human developer makes a mistake in a code editor, they tap `Ctrl+Z` (or `Cmd+Z`) and move on. When an autonomous coding agent makes a mistake, it might have edited 14 files, created 3 new ones, deleted a helper module, updated `package.json`, and filled 40,000 tokens of conversation history explaining why its broken approach is "almost working."
 
-If you cannot rewind an agent cleanly, users become terrified to let it run autonomously. They hover over every single edit approval, or they burn ten minutes untangling broken half-refactors with `git checkout`. **Checkpointing**—taking lightweight, automatic save points of both your workspace and the agent's memory—turns scary, irreversible experimentation into a safe, fast time machine.
+If you cannot rewind an agent cleanly, users become terrified to let it run autonomously. They hover over every single edit approval, or they burn ten minutes untangling broken half-refactors with `git checkout`. **Checkpointing** (taking lightweight, automatic save points of both your workspace and the agent's memory) turns scary, irreversible experimentation into a safe, fast time machine.
 
 ---
 
@@ -14,7 +14,7 @@ If you cannot rewind an agent cleanly, users become terrified to let it run auto
 
 Think of playing a difficult video game right before a boss fight. Before you open the boss room door, you hit **Quick Save**.
 
-- If your strategy fails and your character loses all their gear, you do not try to "manually walk backward and put every broken vase back on the table." You hit **Load Save**. The world, your inventory, and your position snap back to the exact moment before you entered the room—while *you* (the player) still remember what went wrong so you can try a smarter tactic next time.
+- If your strategy fails and your character loses all their gear, you do not try to "manually walk backward and put every broken vase back on the table." You hit **Load Save**. The world, your inventory, and your position snap back to the exact moment before you entered the room, while *you* (the player) still remember what went wrong so you can try a smarter tactic next time.
 
 An agent harness checkpoint is that Quick Save button for software engineering.
 
@@ -31,7 +31,7 @@ Checkpointing directly upgrades **trust, speed, and quality**:
 
 - **Safety without Git pollution:** Developers hate when tools spam their real Git commit history with 47 commits named `"WIP agent step 12"`. A proper checkpoint engine stays completely invisible to `git log` and `git status`.
 - **Faster iteration via branching attempts:** You can let an agent try Approach A (say, rewriting a parser with regex). If it looks messy, you rewind 2 turns and try Approach B (using a proper state machine) in seconds.
-- **Cleaner context windows:** Rewinding conversation history alongside code instantly drops all the dead-end error logs and failed edits from the prompt—preventing **context rot** *(Ch. 09)* and saving tokens on every subsequent turn.
+- **Cleaner context windows:** Rewinding conversation history alongside code instantly drops all the dead-end error logs and failed edits from the prompt, preventing **context rot** *(Ch. 09)* and saving tokens on every subsequent turn.
 - **Crash and interruption recovery:** Paired with a turn state machine *(Ch. 06)*, checkpoints guarantee that a killed process or power outage never leaves a half-applied patch stranded without a known-good state to fall back to.
 
 ---
@@ -98,20 +98,21 @@ Before the harness executes any built-in file mutation tool (`write_file`, `edit
 #### Strategy B: Shadow Git Repository (`GIT_DIR` + `GIT_WORK_TREE`)
 A **Shadow Git repository** is a completely separate `.git` directory stored *outside* the user's project (for example, in `~/.myagent/checkpoints/<project-hash>/.git`).
 
-Git has two built-in environment variables—**`GIT_DIR`** (where Git stores its object database and index) and **`GIT_WORK_TREE`** (which folder of working files Git inspects). By pointing `GIT_DIR` at your hidden shadow repo and `GIT_WORK_TREE` at the user's project directory, Git snapshots the entire workspace—including changes made by shell commands—without ever touching the project's real `.git` folder!
+Git has two built-in environment variables: **`GIT_DIR`** (where Git stores its object database and index) and **`GIT_WORK_TREE`** (which folder of working files Git inspects). By pointing `GIT_DIR` at your hidden shadow repo and `GIT_WORK_TREE` at the user's project directory, Git snapshots the entire workspace, including changes made by shell commands, without ever touching the project's real `.git` folder!
 
-```text
-~/.myagent/checkpoints/proj_8f2a/.git   <-- GIT_DIR (shadow object store + index)
-                                             |
-                                             | snapshots & restores
-                                             v
-/Users/alex/code/my-app/                <-- GIT_WORK_TREE (user's live workspace)
-  ├── .git/                             <-- Completely untouched! Excluded by shadow repo.
-  ├── src/
-  └── tests/
+```mermaid
+flowchart TD
+    Shadow["~/.myagent/checkpoints/proj_8f2a/.git\nGIT_DIR (shadow object store + index)"]
+    subgraph Tree["/Users/alex/code/my-app/ (GIT_WORK_TREE — user's live workspace)"]
+        direction LR
+        DotGit[".git/ (Completely untouched · excluded by shadow repo)"]
+        Src["src/"]
+        Tests["tests/"]
+    end
+    Shadow -->|"snapshots & restores"| Tree
 ```
 
-> **Watch out for nested `.git` directories:** When you run `git add -A` inside a shadow repo whose work tree is `/Users/alex/code/my-app`, Git sees the user's real `.git` directory or submodules. Production shadow-Git engines explicitly ignore `.git` (and nested `.git` directories—sometimes temporarily renaming or excluding them via `info/exclude`) and **sanitize inherited environment variables** so a user's pre-existing `GIT_DIR` or `GIT_INDEX_FILE` inside a Dev Container or CI shell never hijacks the shadow command and corrupts the user's real repo!
+> **Watch out for nested `.git` directories:** When you run `git add -A` inside a shadow repo whose work tree is `/Users/alex/code/my-app`, Git sees the user's real `.git` directory or submodules. Production shadow-Git engines explicitly ignore `.git` (and nested `.git` directories, sometimes temporarily renaming or excluding them via `info/exclude`) and **sanitize inherited environment variables** so a user's pre-existing `GIT_DIR` or `GIT_INDEX_FILE` inside a Dev Container or CI shell never hijacks the shadow command and corrupts the user's real repo!
 
 #### Strategy C: Git Plumbing Snapshots (`git write-tree`)
 Instead of creating heavyweight commits with author names, GPG signing hooks, or pre-commit hooks, you can use Git's **plumbing commands** (low-level building blocks):
@@ -153,7 +154,7 @@ Why is `git write-tree` so loved by harness engineers?
 
 ### 4.3 Coupling Conversation Rollback with Filesystem Rollback
 
-Rewinding disk without rewinding memory—or vice versa—creates **state split-brain**. Let's look at why both halves must move together (unless the user deliberately chooses a partial rewind).
+Rewinding disk without rewinding memory, or vice versa, creates **state split-brain**. Let's look at why both halves must move together (unless the user deliberately chooses a partial rewind).
 
 Suppose a session has 4 turns:
 - **Turn 1:** User asks to add rate limiting. Agent reads `server.ts`.
@@ -183,8 +184,8 @@ When the user selects `chk_002`, the harness offers **three surgical rewind mode
 
 1. **Rewind Code + Conversation (Full Time Travel):**
    - Restore filesystem to `tree_sha` (`chk_002`).
-   - Truncate active message array back to `message_uuid` (ensuring no dangling `tool_use` without a `tool_result`—see *Ch. 06*).
-   - Append a non-destructive `rewind` event to the append-only transcript *(Ch. 37)* so you never lose audit history—you simply point the active branch head backward!
+   - Truncate active message array back to `message_uuid` (ensuring no dangling `tool_use` without a `tool_result`: see *Ch. 06*).
+   - Append a non-destructive `rewind` event to the append-only transcript *(Ch. 37)* so you never lose audit history: you simply point the active branch head backward!
    - **Bonus:** Because the prefix up to `message_uuid` is identical to what was sent earlier, your **prompt cache** *(Ch. 08)* often gets an immediate cache hit on the very next turn!
 2. **Rewind Code Only (Keep Conversation):**
    - Restore filesystem to `tree_sha`, leave the chat history intact, and inject a short synthetic system note into the conversation:
@@ -199,15 +200,23 @@ When the user selects `chk_002`, the harness offers **three surgical rewind mode
 
 Snapshots only rewind **local files**. They are completely powerless against **irreversible side effects** that crossed outside your local filesystem boundary.
 
-```text
-  REVERSIBLE (Local State)                 IRREVERSIBLE (External World)
-  ────────────────────────                 ─────────────────────────────
-  ✓ Edited source files                    ✗ Sent emails / Slack messages
-  ✓ Created / deleted local files          ✗ POST/DELETE to production APIs
-  ✓ Local build artifacts                  ✗ `git push --force` to remote
-  ✓ Conversation history in RAM            ✗ `DROP TABLE` / production migrations
-                                           ✗ `terraform apply` / cloud deploys
-                                           ✗ Published npm/PyPI packages
+<!-- visual:reversible-boundary -->
+```mermaid
+flowchart LR
+    subgraph Rev["Reversible (Local State)"]
+        R1["✓ Edited source files"]
+        R2["✓ Created / deleted local files"]
+        R3["✓ Local build artifacts"]
+        R4["✓ Conversation history in RAM"]
+    end
+    subgraph Irrev["Irreversible (External World)"]
+        I1["✗ Sent emails / Slack messages"]
+        I2["✗ POST/DELETE to production APIs"]
+        I3["✗ git push --force to remote"]
+        I4["✗ DROP TABLE / production migrations"]
+        I5["✗ terraform apply / cloud deploys"]
+        I6["✗ Published npm / PyPI packages"]
+    end
 ```
 
 If an agent runs `stripe charges create` or `git push origin main` during Turn 3, hitting `/rewind` to Turn 2 **will not un-charge the customer or un-push the commit**.
@@ -240,10 +249,10 @@ Here is how real harnesses keep checkpointing fast and tiny:
    - Heavy dependency/build folders: `node_modules/`, `.venv/`, `venv/`, `target/`, `dist/`, `.next/`, `__pycache__/`, `.cache/`
    - Giant media/archive extensions or **any individual file above a size cap** (e.g., `> 10 MB` or `> 25 MB`), logging a warning that oversized binaries were skipped.
 2. **Handling Untracked Files Carefully:**
-   - What if the user has a `.env` file (which is in `.gitignore`) and the agent edits it? If your shadow repo blindly respects `.gitignore`, it *won't* snapshot `.env`—and worse, during rollback, `git clean` must **never** delete ignored files like `.env`, local secrets, or `node_modules`!
+   - What if the user has a `.env` file (which is in `.gitignore`) and the agent edits it? If your shadow repo blindly respects `.gitignore`, it *won't* snapshot `.env`, and worse, during rollback, `git clean` must **never** delete ignored files like `.env`, local secrets, or `node_modules`!
    - Rule of thumb: Track non-ignored untracked source files (like a brand-new `src/helper.ts` the agent created), **skip** ignored directories (`node_modules`, `.env`), and during restore **only delete untracked files that were created *after* the target checkpoint** (compare the file list of `current_tree` vs `target_tree` instead of running blind `git clean -fdx`!).
 3. **Garbage Collection (GC) & Retention Caps:**
-   Unreferenced `git write-tree` objects are called **dangling objects** because no branch or tag points to them—meaning `git gc` will delete them unless you pin them!
+   Unreferenced `git write-tree` objects are called **dangling objects** because no branch or tag points to them, meaning `git gc` will delete them unless you pin them!
    - Pin each active checkpoint with a lightweight Git ref under a private namespace, e.g., `refs/checkpoints/<session_id>/<turn_idx>`, pointing to a tiny commit object wrapping the tree (or write `git update-ref`).
    - Enforce a **per-session cap** (e.g., keep the last 100 checkpoints) and a **TTL sweep** (e.g., delete checkpoint refs older than 30 days).
    - Periodically run `git gc --auto --prune=now` on the shadow repo in the background to pack loose objects into compressed packfiles and reclaim disk space.
@@ -254,10 +263,10 @@ Here is how real harnesses keep checkpointing fast and tiny:
 
 Real-world coding agents have converged on two clear architectural camps:
 
-- **Claude Code (`/rewind` & File Checkpointing):** Uses the **per-turn file backup** approach. Whenever you send a prompt, Claude Code creates a checkpoint and saves pre-edit copies of files modified by its built-in file tools (`Edit`, `Write`, `NotebookEdit`) under `~/.claude/file-history/<session>/`. Pressing `Esc` twice (on an empty input) or typing `/rewind` opens a timeline offering *Restore code and conversation*, *Restore code*, *Restore conversation*, or *Summarize from here*. It retains up to 100 recent checkpoints per session for ~30 days by default. Because it tracks built-in file tools rather than the entire workspace, it is instantaneous even in huge monorepos—with the documented caveat that edits made via raw `Bash` commands (`rm`, `sed`, `mv`) are **not** captured.
+- **Claude Code (`/rewind` & File Checkpointing):** Uses the **per-turn file backup** approach. Whenever you send a prompt, Claude Code creates a checkpoint and saves pre-edit copies of files modified by its built-in file tools (`Edit`, `Write`, `NotebookEdit`) under `~/.claude/file-history/<session>/`. Pressing `Esc` twice (on an empty input) or typing `/rewind` opens a timeline offering *Restore code and conversation*, *Restore code*, *Restore conversation*, or *Summarize from here*. It retains up to 100 recent checkpoints per session for ~30 days by default. Because it tracks built-in file tools rather than the entire workspace, it is instantaneous even in huge monorepos, with the documented caveat that edits made via raw `Bash` commands (`rm`, `sed`, `mv`) are **not** captured.
 - **Cline & Roo Code (Shadow Git Checkpoints):** Use a dedicated **shadow Git repository** stored in VS Code's extension global storage, completely separate from the workspace's `.git` folder. Before each task or modifying step, they snapshot the working directory (excluding heavy build dirs, nested `.git` folders, and large binaries) and sanitize `GIT_DIR` / `GIT_WORK_TREE` environment variables so host or container Git configs cannot interfere. Users can click any message in the chat timeline to view a side-by-side diff or restore workspace + task state.
 - **Gemini CLI (`/restore` with Shadow Git):** Uses an opt-in **shadow Git repository** stored under `~/.gemini/history/<project_hash>` paired with JSON conversation checkpoints in `~/.gemini/tmp/<project_hash>/checkpoints`. Right before executing a file-modifying tool (`write_file`, `replace`), it commits a workspace snapshot and saves the exact conversation history and pending tool call. Running `/restore` reverts both the project files and the conversation back to the moment right before that tool ran, re-proposing the tool so you can steer or reject it.
-- **Aider (`/undo`):** Takes a Git-native approach—by default, Aider makes real, clean auto-commits with descriptive commit messages directly on the user's active Git branch after each edit, so `/undo` simply reverts the last Aider-authored commit (refusing to undo if the user made manual commits on top). Great for developers who love granular Git history, though less invisible than a shadow repo.
+- **Aider (`/undo`):** Takes a Git-native approach, by default, Aider makes real, clean auto-commits with descriptive commit messages directly on the user's active Git branch after each edit, so `/undo` simply reverts the last Aider-authored commit (refusing to undo if the user made manual commits on top). Great for developers who love granular Git history, though less invisible than a shadow repo.
 
 ---
 
@@ -475,12 +484,12 @@ class ShadowGitCheckpointer:
 
 3. **What is the biggest blind spot of per-turn file backups (copy-before-write in `edit_file`/`write_file`) compared to a shadow Git repository?**
    <details><summary>Show Answer</summary>
-   Per-turn file backups only intercept mutations made through the harness's built-in file tools. If the agent runs a shell command (`bash`) that modifies or deletes files—such as `rm`, `mv`, `sed -i`, or a code-generation script—per-turn file backups never saw those writes and cannot roll them back.
+   Per-turn file backups only intercept mutations made through the harness's built-in file tools. If the agent runs a shell command (`bash`) that modifies or deletes files (such as `rm`, `mv`, `sed -i`, or a code-generation script) per-turn file backups never saw those writes and cannot roll them back.
    </details>
 
 4. **Why is running `git clean -fdx` dangerous when rolling back a shadow Git checkpoint?**
    <details><summary>Show Answer</summary>
-   The `-x` flag tells Git to delete **ignored** untracked files too—which wipes out `.env` secret files, local SQLite databases, IDE settings, and `node_modules/`. Instead, compute the exact set difference between the current shadow tree and the target shadow tree and delete only files created *after* the target checkpoint.
+   The `-x` flag tells Git to delete **ignored** untracked files too, which wipes out `.env` secret files, local SQLite databases, IDE settings, and `node_modules/`. Instead, compute the exact set difference between the current shadow tree and the target shadow tree and delete only files created *after* the target checkpoint.
    </details>
 
 ---

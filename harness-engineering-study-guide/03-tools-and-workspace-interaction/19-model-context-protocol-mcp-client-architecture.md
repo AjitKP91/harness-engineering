@@ -4,11 +4,11 @@
 
 # 19. Model Context Protocol (MCP) Client Architecture
 
-Up to this point in Module 3, every tool our harness gave the model—file reading, ripgrep search, LSP diagnostics, shell commands, background daemons—was **built directly into the harness itself**. That works great for your local filesystem and terminal.
+Up to this point in Module 3, every tool our harness gave the model (file reading, ripgrep search, LSP diagnostics, shell commands, background daemons) was **built directly into the harness itself**. That works great for your local filesystem and terminal.
 
 But real software engineering doesn't live only on your laptop's hard drive. Your bug reports live in Linear or Jira. Your pull requests live in GitHub. Your crash stack traces live in Sentry. Your database schema lives in Postgres. Your design specs live in Figma or Google Docs.
 
-How do you let an agent harness connect to *any* external tool or data source without writing—and maintaining—hundreds of bespoke integrations? That is the exact problem the **Model Context Protocol (MCP)** was invented to solve.
+How do you let an agent harness connect to *any* external tool or data source without writing, and maintaining, hundreds of bespoke integrations? That is the exact problem the **Model Context Protocol (MCP)** was invented to solve.
 
 ---
 
@@ -16,21 +16,27 @@ How do you let an agent harness connect to *any* external tool or data source wi
 
 Think back to the early 2000s, when everyone had a tangled drawer full of proprietary phone chargers. A Nokia phone needed a Nokia barrel plug. A Sony Ericsson needed a wide flat connector. A Motorola needed a different plug altogether. Every time you bought a new phone or a new accessory (a car charger, headphones, a laptop dock), they had to be built specifically for each other.
 
-Then **USB-C** arrived. One standard plug, one standard handshake. When you plug a USB-C monitor into a USB-C laptop, the two devices briefly negotiate what each side supports (*"I can send video and receive 65W of power"*), and everything just works—regardless of who manufactured the laptop or the monitor.
+Then **USB-C** arrived. One standard plug, one standard handshake. When you plug a USB-C monitor into a USB-C laptop, the two devices briefly negotiate what each side supports (*"I can send video and receive 65W of power"*), and everything just works: regardless of who manufactured the laptop or the monitor.
 
 **MCP is USB-C for AI agents.**
 
 - **Without MCP**, if there are 10 AI agent harnesses (Claude Code, Codex CLI, Gemini CLI, Cursor, Windsurf, etc.) and 100 developer services (GitHub, Postgres, Sentry, Slack, Figma, Playwright...), the industry has to build and maintain $10 \times 100 = 1,000$ custom connectors. Every time Slack changes an endpoint or a harness changes its tool format, glue code breaks everywhere.
 - **With MCP**, every harness implements **one MCP Client**, and every tool vendor implements **one MCP Server**. Now $10$ harnesses and $100$ services only need $10 + 100 = 110$ implementations, and *any* harness can immediately plug into *any* server.
 
-```text
-  WITHOUT MCP (M x N custom integrations)          WITH MCP (M + N standard plugs)
-
-  Claude Code ──┬── GitHub connector               Claude Code ──┐          ┌── GitHub MCP Server
-                ├── Postgres connector                           │          │
-  Codex CLI   ──┼── Sentry connector               Codex CLI   ──┼── MCP ───┼── Postgres MCP Server
-                ├── Slack connector                              │ Protocol │
-  Gemini CLI  ──┴── Figma connector                Gemini CLI  ──┘          └── Sentry MCP Server
+```mermaid
+flowchart LR
+    subgraph Without["Without MCP (M x N custom integrations)"]
+        direction LR
+        WC["Claude Code"] --> WG["GitHub connector"]
+        WC --> WP["Postgres connector"]
+        WX["Codex CLI"] --> WG & WP & WS["Sentry connector"]
+        WGm["Gemini CLI"] --> WS & WL["Slack / Figma connectors"]
+    end
+    subgraph With["With MCP (M + N standard plugs)"]
+        direction LR
+        MC["Claude Code"] & MX["Codex CLI"] & MGm["Gemini CLI"] --> Proto(("MCP\nProtocol"))
+        Proto --> MG["GitHub MCP Server"] & MP["Postgres MCP Server"] & MS["Sentry MCP Server"]
+    end
 ```
 
 ---
@@ -40,7 +46,7 @@ Then **USB-C** arrived. One standard plug, one standard handshake. When you plug
 From the outside, adding MCP to a harness looks like "just plugging in more tools." Under the hood, MCP client architecture directly shapes four critical properties of your agent:
 
 1. **Extensibility Without Core Bloat:** You never have to ship Postgres drivers, Kubernetes SDKs, or Jira API clients inside your harness binary. Users attach the MCP servers they need via configuration, and your harness discovers their capabilities dynamically at runtime.
-2. **Process and Network Isolation:** Because MCP servers run as separate local subprocesses or remote HTTP services, a crashing third-party server won't crash your agent loop—and you can sandbox local servers separately from your core harness.
+2. **Process and Network Isolation:** Because MCP servers run as separate local subprocesses or remote HTTP services, a crashing third-party server won't crash your agent loop, and you can sandbox local servers separately from your core harness.
 3. **Context Window Economics (The Hidden Trap):** Every connected MCP server advertises its tool schemas to the LLM. Plug in 6 popular servers naively and you can burn **40,000+ input tokens** on JSON schemas *before the user even says hello*. Good MCP client architecture prevents this context explosion.
 4. **Security Boundaries:** Third-party MCP servers are **untrusted code and untrusted data**. A malicious or compromised server can hide prompt injections inside tool descriptions, lie about whether a tool is read-only, or trick the agent into exfiltrating private repo files. Your MCP client is the firewall between the model and those external servers.
 
@@ -52,7 +58,7 @@ The MCP specification defines three distinct roles. Beginners often mix up **Hos
 
 - **MCP Host:** The user-facing AI application or agent harness (e.g., Claude Code, Codex CLI, your IDE). The Host owns the LLM loop, the conversation history, the UI, and security approvals.
 - **MCP Client:** A dedicated protocol connector living *inside* the Host. There is a **1-to-1 connection** between each MCP Client instance and a single MCP Server. A Host managing 5 servers runs 5 MCP Client instances inside an **MCP Client Manager**.
-- **MCP Server:** An external program (local subprocess or remote web service) that exposes capabilities—Tools, Resources, and Prompts—over JSON-RPC 2.0.
+- **MCP Server:** An external program (local subprocess or remote web service) that exposes capabilities (Tools, Resources, and Prompts) over JSON-RPC 2.0.
 
 ```mermaid
 flowchart LR
@@ -90,7 +96,7 @@ MCP uses date-based protocol versions (`YYYY-MM-DD`) negotiated during the conne
 | **`2025-06-18`** | Formalized MCP servers as OAuth Resource Servers using **Resource Indicators (RFC 8707)**; removed JSON-RPC batching; added **Structured Tool Outputs**, **Resource Links**, and **Elicitation** (human-in-the-loop forms). |
 | **`2025-11-25`** | Added **OpenID Connect Discovery** and OAuth Client ID Metadata Documents; expanded Elicitation with **URL Mode** (out-of-band auth/payments); added **Sampling with tool calling**, icons metadata, and incremental scope consent. Alongside this, the **MCP Apps** extension (`io.modelcontextprotocol/ui`) standardized interactive sandboxed UI views. |
 
-When building an MCP client today, target the **2025-06-18 / 2025-11-25** specifications—specifically **Streamable HTTP**, **OAuth 2.1 with PKCE**, **Structured Outputs**, and **Elicitation**.
+When building an MCP client today, target the **2025-06-18 / 2025-11-25** specifications, specifically **Streamable HTTP**, **OAuth 2.1 with PKCE**, **Structured Outputs**, and **Elicitation**.
 
 ---
 
@@ -117,7 +123,7 @@ A tool definition in MCP looks almost identical to the JSON Schema tool definiti
 - **Resource Links**: A tool result can return a lightweight `resource_link` URI instead of dumping a 10 MB log file directly into the tool result, letting the harness or model read it on demand (pair this with Chapter 11's artifact offloading!).
 
 #### 2. Resources & Subscriptions
-Resources are passive, addressable data endpoints—similar to `GET` endpoints in REST. Servers can expose static resources (`config://app`) or parameterized **Resource Templates** (`github://repos/{owner}/{repo}/issues/{number}`). Clients can even subscribe (`resources/subscribe`) to receive `notifications/resources/updated` when an underlying file or log changes.
+Resources are passive, addressable data endpoints: similar to `GET` endpoints in REST. Servers can expose static resources (`config://app`) or parameterized **Resource Templates** (`github://repos/{owner}/{repo}/issues/{number}`). Clients can even subscribe (`resources/subscribe`) to receive `notifications/resources/updated` when an underlying file or log changes.
 
 #### 3. Prompts
 Prompts let an MCP server ship curated domain workflows. For instance, a database MCP server might expose a prompt named `analyze_slow_query` that takes a `query_id` argument and returns pre-assembled messages instructing the LLM how to inspect query plans. Harnesses typically surface MCP Prompts as `/mcp__<server>__<prompt>` slash commands for the user.
@@ -128,7 +134,7 @@ Normally the Host calls the LLM, and the LLM calls the MCP Server. **Sampling fl
 Why is this brilliant? The server author never has to ask users for OpenAI/Anthropic/Google API keys, and the **Host stays in total control** of model selection, cost limits, privacy inspection, and user approval before fulfilling any sampling request.
 
 #### 5. Elicitation (Human-in-the-Loop Forms & Out-of-Band URLs)
-What happens when an MCP tool needs a piece of information the model doesn't know—like *"Which AWS region should I deploy to?"* or *"Please complete 2FA / payment checkout"*? Before Elicitation, the tool had to fail with an error and hope the LLM asked the user correctly.
+What happens when an MCP tool needs a piece of information the model doesn't know, like *"Which AWS region should I deploy to?"* or *"Please complete 2FA / payment checkout"*? Before Elicitation, the tool had to fail with an error and hope the LLM asked the user correctly.
 
 With **Elicitation** (`elicitation/create`), the server pauses execution and asks the Host to prompt the human directly in one of two modes:
 - **Form Mode:** The server sends a flat JSON Schema (`requestedSchema`), and the Host renders a clean form or terminal prompt. The user fills it in, declines, or cancels.
@@ -141,7 +147,7 @@ Text and Markdown aren't always the best way to show a flame graph, an interacti
 
 ### 4.3 Transports: `stdio` vs. Streamable HTTP
 
-MCP is built on **JSON-RPC 2.0**—a tiny, human-readable message format where every message is a JSON object with `"jsonrpc": "2.0"`. There are only three message kinds:
+MCP is built on **JSON-RPC 2.0**: a tiny, human-readable message format where every message is a JSON object with `"jsonrpc": "2.0"`. There are only three message kinds:
 1. **Request:** Has an `id`, `method`, and optional `params`. Expects a matching response with the same `id`.
 2. **Response:** Has the matching `id` and either a `result` or an `error`.
 3. **Notification:** Has a `method` and optional `params`, **no `id`**, and expects no reply.
@@ -161,7 +167,7 @@ In 2024, MCP originally used a two-endpoint **HTTP+SSE** design (`GET /sse` to h
 In `2025-03-26`, MCP replaced it with **Streamable HTTP**:
 - **Single Endpoint:** Everything goes to one URL, such as `https://api.example.com/mcp`.
 - **Client → Server (`POST /mcp`):** The client sends a JSON-RPC request with `Accept: application/json, text/event-stream`.
-  - If the server can answer immediately (e.g., a fast DB lookup), it simply replies with `Content-Type: application/json` and closes the response—works effortlessly on stateless serverless functions!
+  - If the server can answer immediately (e.g., a fast DB lookup), it simply replies with `Content-Type: application/json` and closes the response: works effortlessly on stateless serverless functions!
   - If the server needs to stream progress notifications, take a long time, or send a reverse request (Sampling/Elicitation) mid-call, it replies with `Content-Type: text/event-stream` (SSE) *on that exact same HTTP response* and streams JSON-RPC events until the final response arrives.
 - **Session Tracking (`Mcp-Session-Id` & `MCP-Protocol-Version`):** During `initialize`, a stateful server may return an `Mcp-Session-Id` HTTP header (a cryptographically random ID). The client attaches `Mcp-Session-Id` and `MCP-Protocol-Version: 2025-11-25` to all subsequent requests, and sends `DELETE /mcp` when closing the session.
 - **Server-Initiated Streams & Resumability (`GET /mcp` + `Last-Event-ID`):** A client can optionally open a `GET /mcp` SSE stream for unsolicited server notifications (like `notifications/tools/list_changed`). If the Wi-Fi blinks and drops a stream, the client reconnects with the standard `Last-Event-ID` header and the server replays missed events from that cursor.
@@ -225,7 +231,7 @@ An MCP connection follows a strict, deterministic three-phase lifecycle: **Initi
 
 Look closely at two tiny fields that harness engineers often overlook:
 - **`protocolVersion` negotiation:** If the server does not support the client's requested version, it responds with the latest version *it* supports. The client either accepts that older version or disconnects cleanly.
-- **`instructions`:** Servers can return a short optional usage hint string in `InitializeResult`. Treat it as **low-trust server guidance** (never let it override your system prompt or security rules—Chapter 07!).
+- **`instructions`:** Servers can return a short optional usage hint string in `InitializeResult`. Treat it as **low-trust server guidance** (never let it override your system prompt or security rules: Chapter 07!).
 
 #### Step 2: Deterministic Namespacing & Cache-Stable Tool Ordering
 Now imagine a user connects both a **GitHub** MCP server and a **Linear** MCP server. Both servers expose a tool literally named `create_issue` and another named `search`.
@@ -242,8 +248,8 @@ If you hand both raw names to the LLM, tool routing breaks immediately. Your MCP
 
 Three subtle engineering rules for namespacing:
 1. **Sanitize names for LLM API constraints:** Most LLM APIs restrict tool names to `^[a-zA-Z0-9_-]{1,64}$`. Replace dots, slashes, or spaces (e.g., `my.org/search` → `my_org_search`) and hash-truncate if the combined name exceeds 64 characters while maintaining an exact reverse lookup table (`llm_name -> (server_id, raw_tool_name)`).
-2. **Sort deterministically for Prompt Caching (Ch. 08):** Suppose your harness connects to 4 MCP servers concurrently at startup. Server B might answer `tools/list` before Server A on turn 1, and after Server A on a reconnect. If you append tools in arrival order, your tool array shifts—**busting your entire LLM prompt cache!** Always sort servers alphabetically and sort each server's tools alphabetically by name before serializing schemas.
-3. **Batch `notifications/tools/list_changed` safely:** If a remote server emits `notifications/tools/list_changed` mid-session, don't blindly mutate the tool list in the middle of an active agent turn—mark the cache dirty, re-fetch `tools/list` at the next safe turn boundary, and re-verify tool descriptions against security policies (to catch "rug pulls"!).
+2. **Sort deterministically for Prompt Caching (Ch. 08):** Suppose your harness connects to 4 MCP servers concurrently at startup. Server B might answer `tools/list` before Server A on turn 1, and after Server A on a reconnect. If you append tools in arrival order, your tool array shifts: **busting your entire LLM prompt cache!** Always sort servers alphabetically and sort each server's tools alphabetically by name before serializing schemas.
+3. **Batch `notifications/tools/list_changed` safely:** If a remote server emits `notifications/tools/list_changed` mid-session, don't blindly mutate the tool list in the middle of an active agent turn; mark the cache dirty, re-fetch `tools/list` at the next safe turn boundary, and re-verify tool descriptions against security policies (to catch "rug pulls"!).
 
 #### Step 3: Reconnection & Graceful Shutdown
 Networks drop and local Node/Python processes crash. A production MCP client handles failure automatically:
@@ -279,7 +285,7 @@ Remote MCP servers handle real company data, so pasting static personal access t
 #### Solving MCP Tool-Schema Context Explosion
 This is one of the biggest practical headaches in 2025–2026 agent engineering. Let's do the math:
 
-Suppose a developer enables 6 MCP servers—GitHub (28 tools), Postgres (8 tools), Linear (18 tools), Sentry (12 tools), Slack (15 tools), and Playwright (22 tools).
+Suppose a developer enables 6 MCP servers: GitHub (28 tools), Postgres (8 tools), Linear (18 tools), Sentry (12 tools), Slack (15 tools), and Playwright (22 tools).
 - Total tools: **103 tools**.
 - Average tool schema (name + description + nested JSON properties): **~450 tokens**.
 - **Total overhead before turn 1:** $103 \times 450 \approx \mathbf{46,350\text{ tokens}}$!
@@ -295,15 +301,15 @@ Here is how modern harnesses solve tool-schema context explosion (building direc
 | **3. Deferred Loading + `tool_search`** | Register only a lightweight `tool_search` meta-tool + brief server/tool index upfront. Full JSON schemas are fetched & activated on demand when the model searches for them. | Very Low (~1k–3k tokens base) | Large multi-server setups (30–500+ tools); modern default! |
 | **4. Subagent Scoping** | Keep heavy MCP servers out of the main coding agent; attach them only to a dedicated subagent (e.g., a Browser or DevOps subagent). | Zero in main context | Specialized domains (browser, DB ops, monitoring). |
 
-> **Pro tip for Cache Stability with Deferred Loading:** Never *delete* or *reorder* already-loaded schemas in the middle of a conversation! In a deferred loader, keep your base tool list static at the top (so the prefix stays cached), and inject newly discovered schemas in tool results—or use provider-native deferred loading (`defer_loading: true`) that preserves KV-cache prefix stability behind the scenes.
+> **Pro tip for Cache Stability with Deferred Loading:** Never *delete* or *reorder* already-loaded schemas in the middle of a conversation! In a deferred loader, keep your base tool list static at the top (so the prefix stays cached), and inject newly discovered schemas in tool results, or use provider-native deferred loading (`defer_loading: true`) that preserves KV-cache prefix stability behind the scenes.
 
 ---
 
 ## 5. How Real Harnesses Do It
 
-- **Claude Code (Anthropic):** Supports layered MCP configuration scopes—**local** (user + current project), **project** (`.mcp.json` checked into Git, requiring an explicit first-time approval prompt before spawning!), and **user** (global). Tools are namespaced as `mcp__<server>__<tool>`. Crucially, Claude Code introduced **automatic MCP Tool Search (deferred loading)**: once connected MCP tool definitions exceed a context budget threshold (around 10% of the context window), it automatically switches from eager schema injection to a lightweight search tool so Claude discovers schemas on demand—slashing upfront token overhead by 80–90%.
+- **Claude Code (Anthropic):** Supports layered MCP configuration scopes; **local** (user + current project), **project** (`.mcp.json` checked into Git, requiring an explicit first-time approval prompt before spawning!), and **user** (global). Tools are namespaced as `mcp__<server>__<tool>`. Crucially, Claude Code introduced **automatic MCP Tool Search (deferred loading)**: once connected MCP tool definitions exceed a context budget threshold (around 10% of the context window), it automatically switches from eager schema injection to a lightweight search tool so Claude discovers schemas on demand; slashing upfront token overhead by 80–90%.
 - **OpenAI Codex CLI & Responses API:** Configured via `config.toml` supporting both `stdio` and Streamable HTTP servers with OAuth 2.1 sign-in. At the API layer, OpenAI's Responses API supports `defer_loading: true` alongside a native `tool_search` primitive, letting agents connect large MCP catalogs without blowing up prompt tokens or sacrificing selection accuracy.
-- **Gemini CLI & IDE Harnesses (VS Code / Cursor / Windsurf):** Maintain a central MCP Client Manager that handles OAuth token vaults securely in the OS keychain (never exposing raw access tokens to the LLM or workspace files), surfaces per-server tool toggles in the UI, and—in desktop/IDE hosts like VS Code and Claude Desktop—renders `ui://` **MCP Apps** inside sandboxed iframes inline in the conversation.
+- **Gemini CLI & IDE Harnesses (VS Code / Cursor / Windsurf):** Maintain a central MCP Client Manager that handles OAuth token vaults securely in the OS keychain (never exposing raw access tokens to the LLM or workspace files), surfaces per-server tool toggles in the UI, and, in desktop/IDE hosts like VS Code and Claude Desktop, renders `ui://` **MCP Apps** inside sandboxed iframes inline in the conversation.
 
 ---
 
@@ -569,13 +575,13 @@ class MCPClientManager:
 1. **Why did MCP replace the original 2024 dual-endpoint HTTP+SSE transport with Streamable HTTP in 2025?**
    <details>
    <summary>Show Answer</summary>
-   The old HTTP+SSE transport forced every client to hold open a long-lived `GET /sse` connection while sending requests to a separate `POST /messages` endpoint. That broke frequently on stateless serverless infrastructure, load balancers, and strict proxies. **Streamable HTTP** collapses everything onto a single endpoint where simple requests return plain JSON immediately, while long-running or streaming requests upgrade that same HTTP response to SSE—with `Mcp-Session-Id` tracking and `Last-Event-ID` resumability.
+   The old HTTP+SSE transport forced every client to hold open a long-lived `GET /sse` connection while sending requests to a separate `POST /messages` endpoint. That broke frequently on stateless serverless infrastructure, load balancers, and strict proxies. **Streamable HTTP** collapses everything onto a single endpoint where simple requests return plain JSON immediately, while long-running or streaming requests upgrade that same HTTP response to SSE, with `Mcp-Session-Id` tracking and `Last-Event-ID` resumability.
    </details>
 
 2. **A third-party MCP server connects and advertises a tool `run_query` with `annotations: { "readOnlyHint": true }`. Should your harness automatically skip user approval for it?**
    <details>
    <summary>Show Answer</summary>
-   **No.** In MCP, tool annotations are self-reported hints from the server—not cryptographically verified guarantees. A malicious or buggy server can mark a destructive tool (like `DROP TABLE` or a data-exfiltrating HTTP request) as `readOnlyHint: true`. Only auto-approve based on annotations when the server itself is explicitly trusted by the user or enterprise policy.
+   **No.** In MCP, tool annotations are self-reported hints from the server, not cryptographically verified guarantees. A malicious or buggy server can mark a destructive tool (like `DROP TABLE` or a data-exfiltrating HTTP request) as `readOnlyHint: true`. Only auto-approve based on annotations when the server itself is explicitly trusted by the user or enterprise policy.
    </details>
 
 3. **Why does loading MCP servers in parallel without sorting their tools hurt latency and API cost?**

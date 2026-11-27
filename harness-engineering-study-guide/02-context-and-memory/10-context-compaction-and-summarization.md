@@ -6,37 +6,37 @@
 
 In Chapter 09, you learned how to measure your context window, reserve headroom for output, and set soft and hard budget thresholds. Now comes the moment every long-running agent inevitably hits: **the alarm goes off.** Your agent is 45 tool calls deep into a tricky refactor, the context window is at 80% capacity, and the task is only halfway done.
 
-You cannot just stop the session, and you cannot keep appending forever—soon the provider's API will reject the request with a hard `context_length_exceeded` error, and long before that, **context rot** will quietly wreck the model's reasoning. You need a way to shrink the conversation history while keeping the agent smart, coherent, and focused on the finish line. That craft is called **context compaction**.
+You cannot just stop the session, and you cannot keep appending forever: soon the provider's API will reject the request with a hard `context_length_exceeded` error, and long before that, **context rot** will quietly wreck the model's reasoning. You need a way to shrink the conversation history while keeping the agent smart, coherent, and focused on the finish line. That craft is called **context compaction**.
 
 ---
 
 ## 1. The Simple Idea (Zero-Jargon Intuition)
 
-Imagine a surgeon performing a six-hour operation—or a head chef working through a twelve-course banquet.
+Imagine a surgeon performing a six-hour operation, or a head chef working through a twelve-course banquet.
 
 Early in the shift, the chef's desk starts out clean. By hour three, it is buried under 80 old ingredient lists, scratched-out sauce experiments, grocery receipts from dishes that were already served, and sticky notes from two hours ago. Even though the desk is huge, the chef keeps misplacing the recipe for the *current* course under piles of stale paper.
 
 If the assistant walks in and tries to tidy up, there are three ways to do it:
 
-1. **The Bad Way (Shred the Oldest Half of the Desk):** Grab the bottom half of the pile and throw it straight into the trash. Oops—the very first note at the bottom was the customer's peanut allergy warning!
-2. **The Light Tidy (Micro-Compaction):** Leave the chef's notes alone, but pull out the 30 bulky grocery receipts from courses that are already finished and replace each one with a tiny index card: *"Checked pantry at 2:10 PM — full list filed in Binder #4."*
-3. **The Shift Handoff (Full Summarization):** When even the index cards fill the desk, pause for 10 seconds and write a crisp **one-page shift handoff memo**—listing the allergy warnings, which courses are already plated, which pans are on the stove right now, what went wrong with the soufflé, and the exact next two steps. File the old stack in a cabinet, put the handoff memo on the desk alongside the last 10 minutes of active notes, and keep cooking.
+1. **The Bad Way (Shred the Oldest Half of the Desk):** Grab the bottom half of the pile and throw it straight into the trash. Oops: the very first note at the bottom was the customer's peanut allergy warning!
+2. **The Light Tidy (Micro-Compaction):** Leave the chef's notes alone, but pull out the 30 bulky grocery receipts from courses that are already finished and replace each one with a tiny index card: *"Checked pantry at 2:10 PM; full list filed in Binder #4."*
+3. **The Shift Handoff (Full Summarization):** When even the index cards fill the desk, pause for 10 seconds and write a crisp **one-page shift handoff memo**: listing the allergy warnings, which courses are already plated, which pans are on the stove right now, what went wrong with the soufflé, and the exact next two steps. File the old stack in a cabinet, put the handoff memo on the desk alongside the last 10 minutes of active notes, and keep cooking.
 
 **What breaks if you skip compaction?**
 
 - **Hard crashes mid-task:** The next API call blows past the model's context limit and fails completely.
 - **Silent quality collapse:** Even with a 200k- or 1M-token window, drowning the model in 40 stale file dumps causes it to miss instructions, hallucinate variable names, and loop on solved bugs.
-- **Runaway cost and latency:** Remember that LLMs are stateless—every turn re-reads the *entire* conversation array. Letting history grow unchecked makes turn 60 ten times more expensive and noticeably slower than turn 6.
+- **Runaway cost and latency:** Remember that LLMs are stateless; every turn re-reads the *entire* conversation array. Letting history grow unchecked makes turn 60 ten times more expensive and noticeably slower than turn 6.
 
 ### Key Terms Defined Gently
 
 | Term | Plain-English Meaning |
 | :--- | :--- |
 | **Compaction** | Any process that shrinks the active conversation history sent to the LLM so the session can continue smoothly within its token budget. |
-| **FIFO (First-In, First-Out)** | A naive "sliding window" strategy that simply deletes the oldest messages first—like a conveyor belt pushing early messages off the edge. |
+| **FIFO (First-In, First-Out)** | A naive "sliding window" strategy that simply deletes the oldest messages first, like a conveyor belt pushing early messages off the edge. |
 | **Micro-Compaction** | A fast, deterministic cleanup pass (no extra LLM call) that strips bulky old tool outputs (or old file-write inputs) and replaces them with short placeholder notes. |
 | **Full Summarization** | Asking an LLM to condense a large stretch of older conversation turns into a dense, structured handoff summary, then replacing those turns with the summary. |
-| **Invariant** | A structural rule that must *never* be broken—for example, never leaving an assistant's `tool_use` request without its matching `tool_result` reply. |
+| **Invariant** | A structural rule that must *never* be broken, for example, never leaving an assistant's `tool_use` request without its matching `tool_result` reply. |
 | **Transcript** | The permanent, append-only record of everything that actually happened in the session (saved on disk), separate from the compacted *view* sent to the LLM. |
 
 ---
@@ -50,9 +50,9 @@ Well-engineered compaction impacts all four pillars of a production harness:
 1. **Reliability (Surviving Long Horizons):** Good compaction turns a 200k-token model into an agent that can work coherently across *millions* of cumulative tokens over hours without crashing or losing the thread.
 2. **Reasoning Quality (Fighting Context Rot):** Stripping obsolete stack traces, failed dead-end experiments, and out-of-date copies of files you have already edited raises the **signal-to-noise ratio** of the working memory.
 3. **Cost & Prompt Cache Economics (The Hidden Trade-Off):** Recall from Chapter 08 that prompt caching gives you up to an 80–90% discount when the beginning (prefix) of your prompt stays byte-for-byte identical across turns.
-   - If you compact **on every single turn**, you mutate the prefix every turn and **destroy your cache hit rate**—often making the agent *more* expensive!
+   - If you compact **on every single turn**, you mutate the prefix every turn and **destroy your cache hit rate**: often making the agent *more* expensive!
    - If you compact **infrequently at deliberate thresholds** (say, when context reaches 75–85% of budget, collapsing it back down to ~25–35%), you pay a single cache-write cost once, then enjoy 20–40 cheap cache-hit turns on a much smaller prompt.
-4. **Latency (Faster Time-To-First-Token):** Processing 180k input tokens takes noticeably longer than processing 25k tokens—even with warm KV caches. Compacting brings turn-by-turn snappiness back to life.
+4. **Latency (Faster Time-To-First-Token):** Processing 180k input tokens takes noticeably longer than processing 25k tokens, even with warm KV caches. Compacting brings turn-by-turn snappiness back to life.
 
 ---
 
@@ -95,7 +95,7 @@ while estimate_tokens(messages) > MAX_TOKENS:
 This looks harmless in a casual chat app, and it is **catastrophic** in an agent harness for four distinct reasons:
 
 1. **Loss of Original Goal & Constraints ("First-Turn Amnesia"):** The user's opening prompt is almost always the richest message in the session. It holds the goal, acceptance criteria, and negative constraints (*"Fix the retry bug, but do NOT change the public function signature and do NOT add new packages"*). FIFO deletes it first! Twenty turns later, the agent happily rewrites the public API because the constraint slid off the cliff.
-2. **Broken Protocol Pairs (Instant HTTP 400 Errors):** In Anthropic, OpenAI, and Gemini APIs, an assistant message containing a `tool_use` call (say `id="call_42"`) **must** be followed immediately by a message containing the matching `tool_result` (`tool_use_id="call_42"`). Popping one message at a time inevitably deletes the `tool_use` while leaving an orphaned `tool_result` behind—causing the API to reject the next call with a `400 Bad Request`.
+2. **Broken Protocol Pairs (Instant HTTP 400 Errors):** In Anthropic, OpenAI, and Gemini APIs, an assistant message containing a `tool_use` call (say `id="call_42"`) **must** be followed immediately by a message containing the matching `tool_result` (`tool_use_id="call_42"`). Popping one message at a time inevitably deletes the `tool_use` while leaving an orphaned `tool_result` behind, causing the API to reject the next call with a `400 Bad Request`.
 3. **Architectural Amnesia & Oscillating Bugs:** Suppose in turns 4–8 the agent tried Approach A, discovered it broke an edge case in `payments.py`, reverted it, and switched to Approach B. FIFO drops turns 4–8. On turn 35, the agent sees the remaining code, thinks *"Hey, Approach A would be much cleaner!"*, and re-introduces the exact bug it already ruled out.
 4. **Total Prompt-Cache Destruction:** Because `messages.pop(1)` changes index 1 of the conversation on *every single turn* once the window is full, the prompt prefix changes on every call. Your cache hit rate plummets from ~90% to **0%**, multiplying your API bill by 5x–10x.
 
@@ -116,7 +116,7 @@ Micro-compaction exploits this imbalance:
 - It walks through **older** turns (leaving the most recent turns untouched).
 - It keeps the `assistant` message intact (so the model still remembers *what* it decided to look for and *why*).
 - It replaces the bulky `tool_result` payload with a tiny, informative placeholder stub.
-- Optionally, it also compacts huge old `write_file` / `edit_file` tool inputs into a file path pointer—because the file already lives on disk!
+- Optionally, it also compacts huge old `write_file` / `edit_file` tool inputs into a file path pointer, because the file already lives on disk!
 
 Here is what a single tool turn looks like **before** and **after** micro-compaction:
 
@@ -150,7 +150,7 @@ Notice something magical about this stub: it is **restorable (reversible) compre
 
 #### Tier 2: Full LLM Summarization
 
-Eventually—after 60, 80, or 120 turns—even the assistant thoughts, user messages, and placeholder stubs accumulate enough tokens to cross your hard threshold. At that point, micro-compaction alone cannot reclaim enough space.
+Eventually (after 60, 80, or 120 turns) even the assistant thoughts, user messages, and placeholder stubs accumulate enough tokens to cross your hard threshold. At that point, micro-compaction alone cannot reclaim enough space.
 
 Now the harness runs **Full Summarization**:
 
@@ -178,7 +178,7 @@ If you ask an LLM: *"Summarize our conversation so far"*, you will get four para
 
 **That summary is nearly useless to a coding agent.** Which files? Which function? What failed? What did we already rule out? What are we forbidden from changing?
 
-A great compaction summary is **not a book report—it is a flight recorder and shift handoff checklist.** Every production harness enforces an explicit, structured template so critical engineering facts cannot slip through the cracks:
+A great compaction summary is **not a book report: it is a flight recorder and shift handoff checklist.** Every production harness enforces an explicit, structured template so critical engineering facts cannot slip through the cracks:
 
 ```markdown
 You are compacting an ongoing engineering session so the agent can continue
@@ -259,7 +259,7 @@ An agent waking up to *that* handoff can immediately pick up line 67 of `src/aut
 
 ### 4.4 Preserving Invariants (The Structural Laws of Safe Compaction)
 
-Compaction rewrites the message array you send to the LLM API. If you violate the provider's structural rules—or break the agent's working state—your harness will either crash with HTTP 400 or lobotomize the agent mid-thought.
+Compaction rewrites the message array you send to the LLM API. If you violate the provider's structural rules, or break the agent's working state, your harness will either crash with HTTP 400 or lobotomize the agent mid-thought.
 
 Every production compactor enforces **five strict invariants**:
 
@@ -274,15 +274,15 @@ In modern tool-calling APIs, an assistant message requesting one or more tools a
 
 If your split index falls *between* the assistant message and its `tool_result` message, two bad things happen:
 - The older half ends with an unanswered `tool_use` (summarizer sees an incomplete action).
-- The kept recent tail starts with an **orphaned `tool_result`** whose `tool_use_id` no longer exists in the message array—causing Anthropic, OpenAI, and Gemini APIs to throw an immediate validation error.
+- The kept recent tail starts with an **orphaned `tool_result`** whose `tool_use_id` no longer exists in the message array, causing Anthropic, OpenAI, and Gemini APIs to throw an immediate validation error.
 
-**The rule:** Only place a compaction split boundary *before* a regular `user` message (one that contains human text, not a `tool_result`) or cleanly *between* completed assistant/tool-result exchanges—and ensure the kept tail begins with a valid non-orphan turn.
+**The rule:** Only place a compaction split boundary *before* a regular `user` message (one that contains human text, not a `tool_result`) or cleanly *between* completed assistant/tool-result exchanges, and ensure the kept tail begins with a valid non-orphan turn.
 
 #### Invariant 2: Keep a Verbatim Recent Tail ("Working Set")
 
 Never summarize up to the very last message. If the agent *just* read lines 50–100 of `server.py` and saw a compiler error two seconds ago, turning that into a summary forces it to re-read `server.py` on the very next turn.
 
-Always keep a **protected recent tail** verbatim—for example, the most recent **15,000–25,000 tokens** (or the last 4–6 complete turns), snapped to a safe tool-pair boundary.
+Always keep a **protected recent tail** verbatim, for example, the most recent **15,000–25,000 tokens** (or the last 4–6 complete turns), snapped to a safe tool-pair boundary.
 
 #### Invariant 3: Pin Non-Negotiable Anchors
 
@@ -298,7 +298,7 @@ Some items should *never* be compacted away:
 
 #### Invariant 5: Never Mutate the Permanent Transcript
 
-Your on-disk session log (Ch. 37) is the **source of truth** for debugging, undo/rollback, billing audits, and replay. Treat compaction as creating a new **active prompt view**—or appending a `compaction_checkpoint` event to the JSONL log that says *"for future LLM calls, start reading from this summary block onward."* That way, the full uncompacted history is always preserved on disk (and can even be searched by the agent if needed!).
+Your on-disk session log (Ch. 37) is the **source of truth** for debugging, undo/rollback, billing audits, and replay. Treat compaction as creating a new **active prompt view**: or appending a `compaction_checkpoint` event to the JSONL log that says *"for future LLM calls, start reading from this summary block onward."* That way, the full uncompacted history is always preserved on disk (and can even be searched by the agent if needed!).
 
 Here is the core safe-split logic that enforces Invariants 1 and 2 (you will wire it into a full two-tier compactor in Section 7):
 
@@ -330,7 +330,7 @@ def find_safe_split_index(
     return candidate
 ```
 
-Walk through what that `while` loop guarantees: if `candidate` lands on a `tool_result`, it steps back onto the `assistant` message with the matching `tool_use`—keeping the whole pair intact in the verbatim tail! And if `candidate - 1` had a `tool_use`, it won't chop right after it either.
+Walk through what that `while` loop guarantees: if `candidate` lands on a `tool_result`, it steps back onto the `assistant` message with the matching `tool_use`, keeping the whole pair intact in the verbatim tail! And if `candidate - 1` had a `tool_use`, it won't chop right after it either.
 
 ---
 
@@ -346,10 +346,10 @@ When an agent compacts **three or four times** in a marathon session, compaction
   - Archive the raw transcript to disk and include its path in the summary so the agent can verify exact details if uncertain.
 
 #### 2. Repeated Re-Reading Loops ("Amnesia Tax")
-Micro-compaction clears `src/config.py` because it was read 12 turns ago. On turn 13, the agent needs one field name from `src/config.py`, so it calls `read_file("src/config.py")` again—burning another 3,000 tokens. On turn 18, it happens again!
+Micro-compaction clears `src/config.py` because it was read 12 turns ago. On turn 13, the agent needs one field name from `src/config.py`, so it calls `read_file("src/config.py")` again: burning another 3,000 tokens. On turn 18, it happens again!
 - **Prevention:**
   - Never micro-compact tool results from the most recent $N$ turns (e.g., last 6–10 turns) or recently edited files.
-  - Make your placeholder stub **smart**: instead of `[cleared]`, include lightweight metadata extracted deterministically when the tool ran—e.g., `[Cleared read_file('src/config.py', 310 lines, exports: loadConfig, AuthConfig). Re-read only specific line ranges if needed.]`.
+  - Make your placeholder stub **smart**: instead of `[cleared]`, include lightweight metadata extracted deterministically when the tool ran; e.g., `[Cleared read_file('src/config.py', 310 lines, exports: loadConfig, AuthConfig). Re-read only specific line ranges if needed.]`.
   - Track a **re-read counter** in telemetry (Ch. 38); if the same file is read 3+ times in one session, your micro-compaction window is too aggressive.
 
 #### 3. Silent Loss of User Constraints
@@ -357,7 +357,7 @@ In turn 1, the user writes: *"Migrate the endpoints to async, keep Python 3.10 c
 - **Prevention:** Dedicate an explicit `<goal_and_constraints>` section at the top of the summary template, and keep a pinned copy of user-declared rules/constraints that gets re-injected verbatim into every compaction prompt.
 
 #### 4. The Compaction Overflow Deadlock
-Think about this edge case: your context limit is 200,000 tokens. A huge tool output pushes your history to 198,000 tokens. Your harness triggers Full Summarization—which sends the 198,000-token history *plus* a 1,500-token summarization prompt *plus* a 4,000-token output reservation = **203,500 tokens**. **The compaction call itself fails with `context_length_exceeded`!** Now your session is permanently deadlocked.
+Think about this edge case: your context limit is 200,000 tokens. A huge tool output pushes your history to 198,000 tokens. Your harness triggers Full Summarization, which sends the 198,000-token history *plus* a 1,500-token summarization prompt *plus* a 4,000-token output reservation = **203,500 tokens**. **The compaction call itself fails with `context_length_exceeded`!** Now your session is permanently deadlocked.
 - **Prevention:**
   1. Combine Chapter 11's **front-door output caps** with Chapter 09's **headroom thresholds** (trigger compaction around 75–85%, leaving at least 20k–30k tokens of safety margin).
   2. Always run **emergency deterministic micro-compaction** (clearing *all* older tool results aggressively) *before* sending the payload to the summarizer if the summarization input itself would exceed the model's window.
@@ -374,12 +374,12 @@ Suppose your threshold is 100k tokens, and once you hit 100k you prune *just* 2,
 Compaction has evolved so rapidly between 2025 and 2026 that both **agent harnesses** and **model providers themselves** now build first-class compaction primitives:
 
 - **Anthropic Context Editing & Server-Side Compaction API:** Anthropic introduced dedicated `context_management` strategies directly in the Messages API. Its `clear_tool_uses_20250919` strategy performs **server-side micro-compaction**, automatically clearing older `tool_result` blocks chronologically and replacing them with lightweight placeholders while keeping the rest of the narrative intact. For deeper sessions, Anthropic's server-side compaction (`compact_20260112` and on-demand compaction betas) triggers automatically once input tokens cross a configurable threshold (minimum 50k tokens), generating a typed compaction content block so subsequent calls drop everything prior to it.
-- **Claude Code (`auto-compact` & `/compact`):** Claude Code uses a two-tier strategy out of the box. As a session approaches its context threshold, it first clears bulky old tool outputs, and when more headroom is needed, summarizes older turns into a structured continuation handoff. Users can inspect live window usage with `/context`, configure thresholds with `/autocompact`, or trigger targeted manual compaction like `/compact Focus on the auth refactor and keep the failing test errors`—which often beats generic auto-compaction because the human tells the summarizer what matters next.
+- **Claude Code (`auto-compact` & `/compact`):** Claude Code uses a two-tier strategy out of the box. As a session approaches its context threshold, it first clears bulky old tool outputs, and when more headroom is needed, summarizes older turns into a structured continuation handoff. Users can inspect live window usage with `/context`, configure thresholds with `/autocompact`, or trigger targeted manual compaction like `/compact Focus on the auth refactor and keep the failing test errors`, which often beats generic auto-compaction because the human tells the summarizer what matters next.
 - **OpenAI Responses API Compaction:** OpenAI exposes two complementary primitives in the Responses API:
   1. **Explicit endpoint (`POST /v1/responses/compact`):** You send your conversation history, and OpenAI returns a shortened, **encrypted opaque compaction item** that stands in for all prior turns (including stripping obsolete historical reasoning items while preserving continuity).
   2. **Automatic server-side compaction (`context_management`):** By adding `{"type": "compaction", "compact_threshold": 100000}` to a standard `/v1/responses` request, the server automatically compacts once input tokens cross the threshold. OpenAI explicitly recommends compacting *rarely and structurally* rather than every turn so you retain automatic prefix-cache discounts.
-- **Manus AI (Restorable Compression):** Manus designs tools with **dual representations**—a *full form* stored on the virtual machine's filesystem and a *compact form* kept in the message history. Older tool calls collapse to compact path references (`path="/workspace/report.md"`), making micro-compaction completely reversible without lossy summarization.
-- **Cursor (Searchable Compacted History):** When Cursor compacts a long chat session, it does not throw the original transcript away—it writes the complete history into a local referenceable file. If the agent realizes post-compaction that a nuance or earlier decision was summarized away, it can run `grep` or targeted file reads on its own history file to recover the exact quote.
+- **Manus AI (Restorable Compression):** Manus designs tools with **dual representations**: a *full form* stored on the virtual machine's filesystem and a *compact form* kept in the message history. Older tool calls collapse to compact path references (`path="/workspace/report.md"`), making micro-compaction completely reversible without lossy summarization.
+- **Cursor (Searchable Compacted History):** When Cursor compacts a long chat session, it does not throw the original transcript away; it writes the complete history into a local referenceable file. If the agent realizes post-compaction that a nuance or earlier decision was summarized away, it can run `grep` or targeted file reads on its own history file to recover the exact quote.
 - **LangChain Deep Agents (`deepagents`) & OpenCode:** Both implement explicit multi-tier compression pipelines: first spilling oversized tool outputs to scratch files (Chapter 11), then pruning old tool inputs/outputs with placeholders like `[Old tool result content cleared]` while protecting recent tail turns and key tools, and only falling back to structured LLM summarization when deterministic pruning no longer frees enough budget.
 
 ---
@@ -603,7 +603,7 @@ Notice how every piece reinforces the invariants:
 ## 8. Key Takeaways & Quick Self-Check
 
 ### Key Takeaways
-- **Never use naive FIFO message dropping** in an agent harness—it erases initial constraints, breaks `tool_use`/`tool_result` pairs, and destroys prompt caching on every single turn.
+- **Never use naive FIFO message dropping** in an agent harness: it erases initial constraints, breaks `tool_use`/`tool_result` pairs, and destroys prompt caching on every single turn.
 - **Compact in two tiers:** run deterministic **micro-compaction** first (clearing bulky old tool outputs into restorable stubs), and only invoke **full LLM summarization** when you hit your hard threshold.
 - **Always use a structured handoff template** (goal & constraints, completed work, modified files, rejected paths, open errors, next steps) grounded with deterministic harness facts like `git status`.
 - **Enforce structural invariants:** never split `tool_use`/`tool_result` pairs, preserve a verbatim recent tail, maintain hysteresis for prompt caching, and never overwrite your raw transcript on disk.
@@ -626,7 +626,7 @@ Notice how every piece reinforces the invariants:
 3. **What makes Manus-style micro-compaction "restorable (reversible) compression" compared to full LLM summarization?**
    <details>
    <summary>Show Answer</summary>
-   Full LLM summarization is lossy—nuances, exact line numbers, or subtle constraints can vanish forever if omitted from the prose. Restorable compression removes bulky payloads (like file reads or offloaded search outputs) from the active context window while keeping a lightweight pointer (such as the file path on disk). Because the full source data still exists on disk, the agent can retrieve any omitted detail on demand with zero permanent information loss.
+   Full LLM summarization is lossy: nuances, exact line numbers, or subtle constraints can vanish forever if omitted from the prose. Restorable compression removes bulky payloads (like file reads or offloaded search outputs) from the active context window while keeping a lightweight pointer (such as the file path on disk). Because the full source data still exists on disk, the agent can retrieve any omitted detail on demand with zero permanent information loss.
    </details>
 
 4. **Why is "repeated compaction" (compacting 4+ times in a long session) vulnerable to drift, and how do you defend against it?**

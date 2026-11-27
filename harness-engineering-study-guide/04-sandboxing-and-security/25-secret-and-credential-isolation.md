@@ -4,15 +4,15 @@
 
 # 25. Secret & Credential Isolation
 
-In Chapter 24, we learned how to guard an agent's reasoning against untrusted inputs and break the Lethal Trifecta. Now let's look at the single highest-value target sitting on almost every developer's computer: **secrets and credentials**—API keys, GitHub tokens, cloud access keys, SSH private keys, and database passwords.
+In Chapter 24, we learned how to guard an agent's reasoning against untrusted inputs and break the Lethal Trifecta. Now let's look at the single highest-value target sitting on almost every developer's computer: **secrets and credentials**: API keys, GitHub tokens, cloud access keys, SSH private keys, and database passwords.
 
-If a coding agent accidentally deletes a source file, `git checkout` brings it back in two seconds. If a coding agent leaks a production cloud key into a prompt log, a public pull request, or an external endpoint, **you cannot undo it**—you have an active security incident and an emergency key rotation on your hands.
+If a coding agent accidentally deletes a source file, `git checkout` brings it back in two seconds. If a coding agent leaks a production cloud key into a prompt log, a public pull request, or an external endpoint, **you cannot undo it**: you have an active security incident and an emergency key rotation on your hands.
 
 ---
 
 ## 1. The Simple Idea: Valet Keys and Sealed Envelopes
 
-Imagine you pull up to a hotel and hand your car over to the valet. Do you hand them your **entire keyring**—house keys, safe deposit key, office badge—plus your wallet with your credit cards and PIN numbers?
+Imagine you pull up to a hotel and hand your car over to the valet. Do you hand them your **entire keyring** (house keys, safe deposit key, office badge) plus your wallet with your credit cards and PIN numbers?
 
 Of course not! You hand them a **valet key**: a restricted key that starts the engine and opens the driver's door, cannot open the glovebox or trunk, and stays useless the moment you take the car back.
 
@@ -26,7 +26,7 @@ That is **Secret & Credential Isolation** in an agent harness:
 
 **What breaks if you don't isolate secrets?**
 - Every subprocess your agent spawns inherits your shell's entire environment (`AWS_SECRET_ACCESS_KEY`, `OPENAI_API_KEY`, `GITHUB_TOKEN`, `DATABASE_URL`) by default.
-- A single debugging command (`env`, `printenv`, `curl -v`, or a verbose stack trace) dumps live production secrets directly into the LLM's context window—sending them to an external model provider and saving them permanently in local transcript files.
+- A single debugging command (`env`, `printenv`, `curl -v`, or a verbose stack trace) dumps live production secrets directly into the LLM's context window: sending them to an external model provider and saving them permanently in local transcript files.
 - A prompt injection (Chapter 24) or compromised `npm install` postinstall script inside the workspace can harvest real credentials immediately.
 
 ---
@@ -37,7 +37,7 @@ Most traditional developer tools don't have a "secret pipeline" problem because 
 
 1. **Everything the tool prints leaves your machine.** When a shell command prints a secret to `stdout` or `stderr`, the harness captures that text and sends it over HTTPS to the **Large Language Model (LLM)** API on the next turn. Even with zero-data-retention enterprise agreements, you never want live production passwords sitting inside model prompts.
 2. **Harnesses persist everything for debugging and replay.** Modern harnesses write append-only JSONL session transcripts (Chapter 37), crash logs, and OpenTelemetry tracing spans (Chapter 38). One unredacted `.env` read can duplicate a secret into five different log files and cloud dashboards.
-3. **Coding agents run untrusted third-party code.** Running `npm test`, `pytest`, or `cargo build` executes thousands of lines of third-party dependencies and build scripts inside the same process tree. If real credentials live in environment variables or readable files inside the sandbox, *any* dependency can read them—no prompt injection required!
+3. **Coding agents run untrusted third-party code.** Running `npm test`, `pytest`, or `cargo build` executes thousands of lines of third-party dependencies and build scripts inside the same process tree. If real credentials live in environment variables or readable files inside the sandbox, *any* dependency can read them: no prompt injection required!
 4. **Static secrets outlive the session.** Unlike a broken edit that you can roll back with a Git checkpoint (Chapter 36), an exposed long-lived token remains dangerous until a human detects the leak and revokes it across every system.
 
 > **The golden rule of credential isolation:** The agent and its sandbox should **never possess a raw secret** whenever a host-side proxy, brokered tool, or short-lived scoped token can do the job instead.
@@ -46,7 +46,7 @@ Most traditional developer tools don't have a "secret pipeline" problem because 
 
 ## 3. The Big Picture
 
-In a properly isolated harness, real credentials live strictly in the **Host Control Plane**—never inside the sandboxed process tree, never in raw LLM prompts, and never in transcripts or telemetry:
+In a properly isolated harness, real credentials live strictly in the **Host Control Plane**: never inside the sandboxed process tree, never in raw LLM prompts, and never in transcripts or telemetry:
 
 ```mermaid
 flowchart LR
@@ -63,7 +63,7 @@ flowchart LR
 
 Look closely at the two protective choke points:
 1. **Outbound to external APIs (`Host Egress Credential Proxy`):** The sandbox only holds a dummy placeholder; the host proxy validates the destination hostname and swaps in the real secret on the wire.
-2. **Inbound back to the harness (`Redaction Pipeline`):** Before any tool output touches the LLM prompt, disk transcript, or observability pipeline, a deterministic scanner masks anything that looks like—or exactly matches—a real secret.
+2. **Inbound back to the harness (`Redaction Pipeline`):** Before any tool output touches the LLM prompt, disk transcript, or observability pipeline, a deterministic scanner masks anything that looks like, or exactly matches, a real secret.
 
 ---
 
@@ -75,7 +75,7 @@ Before you can plug leaks, you have to map every pipe secrets travel through. In
 
 | Leak Channel | How It Happens in Real Sessions | Why Teams Miss It | Primary Architectural Defense |
 | :--- | :--- | :--- | :--- |
-| **1. Inherited Environment Variables** | Harness calls `subprocess.run("pytest")` without overriding `env`; child process inherits the parent shell's entire `os.environ` (`AWS_*`, `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`). | Works silently in local testing—nobody notices until a test logs `process.env` or dumps a config object on crash. | **Allowlist-based environment scrubbing** on every spawned subprocess and PTY. |
+| **1. Inherited Environment Variables** | Harness calls `subprocess.run("pytest")` without overriding `env`; child process inherits the parent shell's entire `os.environ` (`AWS_*`, `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`). | Works silently in local testing: nobody notices until a test logs `process.env` or dumps a config object on crash. | **Allowlist-based environment scrubbing** on every spawned subprocess and PTY. |
 | **2. Workspace & Host Secret Files** | Agent runs `read_file(".env")`, `grep "API_KEY"`, or reads `~/.aws/credentials`, `~/.npmrc`, `~/.netrc`, or `~/.ssh/id_ed25519`. | Engineers scrub `env`, then forget `.env` is sitting right inside the repository folder! | **OS sandbox path denies** (Chapter 22) + tool-level ignore lists for `.env*`, `*.pem`, `*.key`, and credential dirs. |
 | **3. Command Output & Debug Traces** | `curl -v`, HTTP client debug logs, Terraform plans, or exception tracebacks print `Authorization: Bearer ...` headers or database URLs with embedded passwords. | Even legitimate debugging commands echo credentials in error messages. | **Proxy-based credential injection** (so the tool never saw the real header) + **output redaction**. |
 | **4. Transcripts & Checkpoints** | Harness saves full raw tool results to `~/.agent/sessions/*.jsonl` or creates shadow Git snapshots (Chapter 36) that accidentally include `.env`. | Transcripts are written by the *host* harness, which may log raw outputs before redacting for the UI. | **Redact at ingestion** (before writing to context *and* before writing to disk); exclude secret patterns from checkpoints. |
@@ -161,42 +161,45 @@ def build_scrubbed_env(
     return scrubbed
 ```
 
-Notice how clean this is: even if the host shell has 85 exported variables including 12 production tokens, the child process sees only ~15 safe system variables—and zero real keys.
+Notice how clean this is: even if the host shell has 85 exported variables including 12 production tokens, the child process sees only ~15 safe system variables, and zero real keys.
 
 ---
 
 ### 4.3 Proxy-Based Credential Injection (Zero-Secret Sandboxes)
 
-Environment scrubbing solves accidental leaks when the sandbox *doesn't need* a credential. But what when the agent legitimately **does** need to talk to an authenticated API—such as pushing a branch to GitHub, pulling a private npm/PyPI package, or calling an internal staging API?
+Environment scrubbing solves accidental leaks when the sandbox *doesn't need* a credential. But what when the agent legitimately **does** need to talk to an authenticated API, such as pushing a branch to GitHub, pulling a private npm/PyPI package, or calling an internal staging API?
 
 If you inject the real `GITHUB_TOKEN` into the sandbox, you're back to square one: any command, test, or prompt-injected script inside the sandbox can read and steal it.
 
-The modern 2025–2026 architectural solution—pioneered in micro-VM agent sandboxes like **Gondolin**, cloud coding sandboxes, and enterprise AI gateways—is **Proxy-Based Credential Injection** (also called a **Credential Injection Proxy** or **Secret-Free Sandbox**).
+The modern 2025–2026 architectural solution (pioneered in micro-VM agent sandboxes like **Gondolin**, cloud coding sandboxes, and enterprise AI gateways) is **Proxy-Based Credential Injection** (also called a **Credential Injection Proxy** or **Secret-Free Sandbox**).
 
 #### How It Works Step by Step
 
 1. **Mint an opaque placeholder on the host:** Before starting the sandbox, the host harness registers each real secret in memory and generates a unique, high-entropy **placeholder token** (for example, `HARNESS_PLACEHOLDER_GH_7a9e4c1b8f20...`), bound to a strict **host allowlist** (for example, `api.github.com` and `github.com` only).
 2. **Pass *only* the placeholder into the sandbox:** Inside the sandbox, `GITHUB_TOKEN` is set to `HARNESS_PLACEHOLDER_GH_7a9e4c1b8f20...`, and outbound HTTP/HTTPS traffic is forced through a host-side proxy (`HTTP_PROXY` / `HTTPS_PROXY`, or a virtual network interface inside a micro-VM with no direct internet route).
-3. **Intercept outbound requests at the host boundary:** When `git`, `gh`, `npm`, or a Python script makes an HTTPS request to `https://api.github.com/repos/...`, the request hits the host-side proxy (which terminates **Transport Layer Security (TLS)** using a locally trusted sandbox CA certificate—the sandbox only trusts the proxy's ephemeral CA).
+3. **Intercept outbound requests at the host boundary:** When `git`, `gh`, `npm`, or a Python script makes an HTTPS request to `https://api.github.com/repos/...`, the request hits the host-side proxy (which terminates **Transport Layer Security (TLS)** using a locally trusted sandbox CA certificate; the sandbox only trusts the proxy's ephemeral CA).
 4. **Verify destination host, then swap on the wire:**
    - The proxy checks: *Does this request's target hostname match the exact host allowlist bound to `HARNESS_PLACEHOLDER_GH_...`?*
    - **If YES (`api.github.com`):** The proxy replaces the placeholder in the `Authorization` header (or configured header) with the **real token**, forwards the request over standard TLS to GitHub, and scrubs the real token from any response/error echo before returning the response to the sandbox.
    - **If NO (e.g., `untrusted.example`):** The proxy **refuses to substitute** (and ideally blocks the request outright and logs a high-severity security alert!). Even if the request ever got out, the recipient would only receive a worthless placeholder string.
 
-```text
-  SANDBOX (Untrusted Execution Zone)              HOST PROXY (Trusted Zone)            EXTERNAL API
-  ==================================              =========================            ============
-  env: GITHUB_TOKEN=PLACEHOLDER_GH_7a9e...
+```mermaid
+flowchart LR
+    subgraph Sandbox["Sandbox (Untrusted Zone · GITHUB_TOKEN=PLACEHOLDER_GH_7a9e)"]
+        Legit["1. Legitimate tool calls api.github.com\nAuthorization: Bearer PLACEHOLDER_GH_7a9e"]
+        Bad["2. Compromised script tries untrusted.example\nAuthorization: Bearer PLACEHOLDER_GH_7a9e"]
+    end
+    subgraph Proxy["Host Proxy (Trusted Zone)"]
+        Allow["Host == api.github.com? YES!\nSwap -> Bearer ghs_real_token\nLogs: 'GH token used for /pulls'"]
+        Deny["Host == api.github.com? NO!\nBLOCKED + Security Alert!\nReal token NEVER leaves host"]
+    end
+    subgraph External["External APIs"]
+        GH["api.github.com"]
+        Evil["untrusted.example"]
+    end
 
-  1. Legitimate tool calls api.github.com:
-     Authorization: Bearer PLACEHOLDER_GH_7a9e ──▶ Host == api.github.com? YES!
-                                                   Swap -> Bearer ghs_real_token ──▶  api.github.com
-                                                   (Logs: "GH token used for /pulls")
-
-  2. Compromised script tries untrusted.example:
-     Authorization: Bearer PLACEHOLDER_GH_7a9e ──▶ Host == api.github.com? NO!
-                                                   BLOCKED + Security Alert!     ✗    untrusted.example
-                                                   (Real token NEVER leaves host)
+    Legit --> Allow --> GH
+    Bad --> Deny -.->|"✗ Blocked"| Evil
 ```
 
 #### Comparing Credential Delivery Architectures
@@ -221,7 +224,7 @@ A **Redaction Pipeline** is your deterministic safety net. It runs synchronously
 Effective redaction combines **three complementary detection engines**:
 
 #### 1. Exact-Value Dynamic Registry (Zero False Negatives for Known Secrets)
-Before the session begins, the host harness already knows the exact values of sensitive host environment variables (e.g., `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GITHUB_TOKEN`) and any secrets loaded into the credential proxy. Register those exact strings—**plus their Base64 and URL-encoded variants**—in an in-memory redactor. Even if a secret has an unusual custom format with no prefix, exact matching catches it 100% of the time.
+Before the session begins, the host harness already knows the exact values of sensitive host environment variables (e.g., `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GITHUB_TOKEN`) and any secrets loaded into the credential proxy. Register those exact strings, **plus their Base64 and URL-encoded variants**, in an in-memory redactor. Even if a secret has an unusual custom format with no prefix, exact matching catches it 100% of the time.
 
 #### 2. Structured Prefix & Regular Expression (Regex) Rules
 Modern cloud providers and API vendors intentionally add recognizable prefixes (and sometimes checksums) to their tokens specifically so scanners like **Gitleaks** and **TruffleHog** can catch them accurately:
@@ -242,7 +245,7 @@ What about a custom internal API token with no standard prefix, like `X-Internal
 - Normal English words or identifiers (`calculate_user_invoice`): low entropy (~3.0–3.8 bits/char).
 - Randomly generated secrets: **Base64 / URL-safe alphanumeric tokens** reach ~4.5–5.9 bits/char, while **hexadecimal keys** cap at $\log_2(16) = 4.0$ bits/char (~3.7–4.0 bits/char).
 
-**Crucial trick:** Never run raw entropy scanning across all code output blindly—otherwise you will redact every Git commit SHA, UUID, Webpack bundle hash, and `package-lock.json` integrity digest, ruining the agent's ability to debug! Instead, make entropy scanning **context-aware**: trigger it only when a high-entropy token (≥ 20 chars, entropy ≥ 4.2) appears right next to a sensitive assignment or header keyword (`password`, `secret`, `token`, `api_key`, `authorization`, `bearer`, `client_secret`) and does *not* match known non-secret formats (like pure 40-char hex git SHAs or UUIDs).
+**Crucial trick:** Never run raw entropy scanning across all code output blindly; otherwise you will redact every Git commit SHA, UUID, Webpack bundle hash, and `package-lock.json` integrity digest, ruining the agent's ability to debug! Instead, make entropy scanning **context-aware**: trigger it only when a high-entropy token (≥ 20 chars, entropy ≥ 4.2) appears right next to a sensitive assignment or header keyword (`password`, `secret`, `token`, `api_key`, `authorization`, `bearer`, `client_secret`) and does *not* match known non-secret formats (like pure 40-char hex git SHAs or UUIDs).
 
 #### Streaming Chunk-Boundary Protection
 When streaming command output in chunks (Chapters 02, 17), a 40-character API key can easily get sliced right down the middle across two consecutive chunks (`"Authorization: Bearer sk-ant-api03-abc"` followed by `"def123456..."`). If you scan each chunk independently, you miss the split secret!
@@ -259,14 +262,14 @@ Even the best proxy and redactor follow defense in depth: always assume that som
 | :--- | :--- | :--- |
 | **Lifespan** | Months, years, or "never expires." | **15 minutes to 1 hour** (automatically expires when the task finishes). |
 | **Scope of Access** | Usually tied to your entire user identity across dozens of repos or cloud accounts. | Scoped to **one repository**, one branch prefix, or one staging namespace. |
-| **Identity in Audit Logs** | Looks identical to you—impossible to tell whether *you* or the *agent* made the API call. | Distinct bot/agent identity (`agent-runner[bot]`), cleanly auditable and revocable. |
+| **Identity in Audit Logs** | Looks identical to you: impossible to tell whether *you* or the *agent* made the API call. | Distinct bot/agent identity (`agent-runner[bot]`), cleanly auditable and revocable. |
 | **If Exposed** | Urgent security incident; manual rotation across every developer machine and CI job. | Rapidly expires on its own; minimal blast radius even during its short window. |
 
 #### Practical Short-Lived Patterns for Agent Harnesses
-- **GitHub:** Mint a **GitHub App installation token** (`ghs_...`, 1-hour TTL) scoped strictly to `contents: write` and `pull_requests: write` on the single target repository—never `admin` or org-wide access.
+- **GitHub:** Mint a **GitHub App installation token** (`ghs_...`, 1-hour TTL) scoped strictly to `contents: write` and `pull_requests: write` on the single target repository, never `admin` or org-wide access.
 - **Cloud Providers (AWS / GCP / Azure):** Exchange an **OpenID Connect (OIDC)** workload identity token for short-lived **AWS STS** (`ASIA...`) or GCP short-lived OAuth tokens scoped to a read-only or sandboxed staging role.
-- **MCP Servers:** Use **OAuth 2.0** authorization flows (Chapter 19) with granular read-only scopes (e.g., `issues:read` instead of full workspace write) and short-lived access tokens managed on the host—never hand raw OAuth refresh tokens to the sandbox.
-- **Databases:** If an agent needs to inspect schemas or debug queries, point it at a **local seeded container** or a **read-only, PII-anonymized replica** with a temporary session credential—never production read-write credentials.
+- **MCP Servers:** Use **OAuth 2.0** authorization flows (Chapter 19) with granular read-only scopes (e.g., `issues:read` instead of full workspace write) and short-lived access tokens managed on the host, never hand raw OAuth refresh tokens to the sandbox.
+- **Databases:** If an agent needs to inspect schemas or debug queries, point it at a **local seeded container** or a **read-only, PII-anonymized replica** with a temporary session credential, never production read-write credentials.
 
 ---
 
@@ -276,7 +279,7 @@ Leading open-source and production coding agents in 2025–2026 apply these exac
 
 - **OpenAI Codex CLI (`shell_environment_policy`):** Builds child process environments from scratch using an explicit `config.toml` policy (`inherit = "core"`, `ignore_default_excludes = false` to strip `KEY`/`SECRET`/`TOKEN`, wildcard `filters` like `"AWS_*" = "exclude"`, and `set` for safe static overrides). This guarantees subprocesses inside the OS sandbox never inherit the user's ambient terminal secrets.
 - **Gondolin (Earendil / Armin Ronacher):** An open-source lightweight Linux micro-VM agent sandbox with a programmable host-side TypeScript/JavaScript control plane. Instead of passing real API keys into the guest VM, Gondolin injects dummy placeholder strings (`GONDOLIN_SECRET_*`) and intercepts outbound HTTP/TLS traffic on the host, substituting the real credential *only* when the destination matches an explicitly allowed upstream host.
-- **GitHub Copilot Coding Agent:** Combines ephemeral cloud sandboxes with short-lived, repository-scoped **GitHub App installation tokens** (`ghs_`, ~1-hour expiry) and an **Agent Firewall** that blocks unapproved outbound hosts—shrinking both the credential's lifetime and its reachable network surface.
+- **GitHub Copilot Coding Agent:** Combines ephemeral cloud sandboxes with short-lived, repository-scoped **GitHub App installation tokens** (`ghs_`, ~1-hour expiry) and an **Agent Firewall** that blocks unapproved outbound hosts; shrinking both the credential's lifetime and its reachable network surface.
 - **Enterprise AI Gateways & Stateless Redaction Proxies:** Production enterprise wrappers (such as CLI redaction wrappers and stateless tokenization proxies like OVHcloud's *Pookie* design) dynamically learn local `.env` values at startup, combine them with Gitleaks-style regex rules, and replace secrets with deterministic placeholders in real time across streaming SSE and JSON tool payloads before traffic reaches external LLM providers or audit logs.
 
 ---
@@ -284,7 +287,7 @@ Leading open-source and production coding agents in 2025–2026 apply these exac
 ## 6. Common Pitfalls & Failure Modes
 
 1. **Scrubbing `env` while leaving `.env` readable inside the workspace.**
-   *Why it fails:* Your child process has a spotless environment—and then the agent (or a test script) simply runs `cat .env` and prints every database password into stdout.
+   *Why it fails:* Your child process has a spotless environment, and then the agent (or a test script) simply runs `cat .env` and prints every database password into stdout.
    *Fix:* Block `.env`, `.env.local`, `.env.production`, `*.pem`, and `*.key` via OS sandbox read-deny rules (Chapter 22) *and* file-tool deny globs, while providing a sanitized `.env.example` or mock values for local tests.
 
 2. **Building a credential proxy without strict host binding.**
@@ -297,10 +300,10 @@ Leading open-source and production coding agents in 2025–2026 apply these exac
 
 4. **Redacting only for the LLM, while logging raw outputs to disk or telemetry.**
    *Why it fails:* Your LLM API call is clean, yet `~/.agent/transcripts/session.jsonl` and your OpenTelemetry backend quietly store raw credentials in plaintext.
-   *Fix:* Make redaction the **very first step** inside your tool runner's output capture pipeline—every downstream consumer (LLM context, UI, disk transcript, telemetry) receives the *already-redacted* stream.
+   *Fix:* Make redaction the **very first step** inside your tool runner's output capture pipeline; every downstream consumer (LLM context, UI, disk transcript, telemetry) receives the *already-redacted* stream.
 
 5. **Over-aggressive entropy redaction that destroys debuggability.**
-   *Why it fails:* Flagging every high-entropy 32-char string masks Git commit hashes, SHA-256 checksums, Docker image digests, and lockfile hashes—making the agent blind to real build errors.
+   *Why it fails:* Flagging every high-entropy 32-char string masks Git commit hashes, SHA-256 checksums, Docker image digests, and lockfile hashes, making the agent blind to real build errors.
    *Fix:* Combine entropy checks with nearby keyword context (`token`, `secret`, `password`, `bearer`) and explicitly exempt standard non-secret hashes (UUIDs, 40/64-char hex digests, `sha512-...` SRI hashes).
 
 ---
@@ -308,8 +311,8 @@ Leading open-source and production coding agents in 2025–2026 apply these exac
 ## 7. Build It Yourself: Mini-Lab — Zero-Secret Credential Proxy + Redaction Pipeline
 
 Below is a compact, self-contained Python blueprint demonstrating both halves of credential isolation:
-1. **`CredentialProxy`** — mints opaque placeholder tokens bound to exact host allowlists, swaps real credentials *only* on approved outbound hosts, and rejects unapproved destinations.
-2. **`SecretRedactor`** — combines exact known-secret matching (including Base64 variants), structured regex patterns, and context-aware Shannon entropy detection before text ever reaches the LLM or logs.
+1. **`CredentialProxy`**: mints opaque placeholder tokens bound to exact host allowlists, swaps real credentials *only* on approved outbound hosts, and rejects unapproved destinations.
+2. **`SecretRedactor`**: combines exact known-secret matching (including Base64 variants), structured regex patterns, and context-aware Shannon entropy detection before text ever reaches the LLM or logs.
 
 ```python
 import base64
@@ -514,7 +517,7 @@ if __name__ == "__main__":
 - **Map all five leak channels:** Environment variables, workspace/host secret files (`.env`, `~/.ssh`), command output/tracebacks, persistent disk transcripts, and LLM/telemetry payloads.
 - **Scrub child environments with an allowlist:** Start from an empty dict and inherit only core system variables (`PATH`, `HOME`, `LANG`, `TMPDIR`), never raw `os.environ`.
 - **Use proxy-based credential injection for zero-secret sandboxes:** Give the sandbox an opaque placeholder token; let a host-side proxy swap in the real credential *only* when the destination hostname matches an explicit allowlist.
-- **Layer your redaction pipeline upstream of everything:** Combine an exact-value registry (+ Base64/URL-encoded variants), structured provider regexes, and context-aware Shannon entropy scanning—and run it *before* data hits the LLM, transcripts, or telemetry.
+- **Layer your redaction pipeline upstream of everything:** Combine an exact-value registry (+ Base64/URL-encoded variants), structured provider regexes, and context-aware Shannon entropy scanning, and run it *before* data hits the LLM, transcripts, or telemetry.
 - **Replace static personal tokens with ephemeral, least-privilege credentials:** Use short-lived GitHub App installation tokens (`ghs_`), OIDC/STS cloud sessions, and tightly scoped OAuth tokens so any worst-case incident has a minimal blast radius.
 
 ### Quick Self-Check
@@ -522,7 +525,7 @@ if __name__ == "__main__":
 1. **Why is an allowlist-based environment scrubber safer than a denylist that blocks `*_KEY`, `*_SECRET`, and `*_TOKEN`?**
    <details>
    <summary>Show Answer</summary>
-   Denylists constantly miss non-obvious variable names that still hold live credentials—such as `DATABASE_URL`, `PGPASSWORD`, `REDIS_URL`, `SENTRY_DSN`, or custom company variables like `BILLING_PASS`. An allowlist starts from an empty environment and passes only known-safe system variables (`PATH`, `HOME`, `LANG`, `TMPDIR`, etc.), failing closed by default.
+   Denylists constantly miss non-obvious variable names that still hold live credentials, such as `DATABASE_URL`, `PGPASSWORD`, `REDIS_URL`, `SENTRY_DSN`, or custom company variables like `BILLING_PASS`. An allowlist starts from an empty environment and passes only known-safe system variables (`PATH`, `HOME`, `LANG`, `TMPDIR`, etc.), failing closed by default.
    </details>
 
 2. **In proxy-based credential injection, why must every placeholder token be strictly bound to an allowlist of destination hostnames?**
@@ -534,7 +537,7 @@ if __name__ == "__main__":
 3. **Why should Shannon entropy scanning in a coding agent be context-aware rather than applied blindly to all command output?**
    <details>
    <summary>Show Answer</summary>
-   Software repositories and build logs are packed with legitimate high-entropy strings that are *not* secrets—such as Git commit SHAs, UUIDs, Docker image digests, and `package-lock.json` integrity hashes. Blind entropy scanning redacts those hashes and breaks debugging. Pairing entropy thresholds with nearby sensitive keywords (`password`, `token`, `secret`, `bearer`) and exempting standard hash formats keeps false positives low.
+   Software repositories and build logs are packed with legitimate high-entropy strings that are *not* secrets, such as Git commit SHAs, UUIDs, Docker image digests, and `package-lock.json` integrity hashes. Blind entropy scanning redacts those hashes and breaks debugging. Pairing entropy thresholds with nearby sensitive keywords (`password`, `token`, `secret`, `bearer`) and exempting standard hash formats keeps false positives low.
    </details>
 
 4. **Why are short-lived GitHub App installation tokens (`ghs_`) or OIDC/STS sessions much safer for autonomous coding agents than a developer's static Personal Access Token (PAT)?**

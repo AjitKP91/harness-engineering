@@ -4,7 +4,7 @@
 
 # 22. Filesystem & Network Isolation
 
-In Chapter 21, you learned *which* walls an operating system can build around an agent (Seatbelt, Bubblewrap, Landlock, containers, and microVMs). Now comes the harder and more practical question: **where exactly should you place the walls, where should you put locked doors, and what subtle cracks do attackers—and careless scripts—slip through?**
+In Chapter 21, you learned *which* walls an operating system can build around an agent (Seatbelt, Bubblewrap, Landlock, containers, and microVMs). Now comes the harder and more practical question: **where exactly should you place the walls, where should you put locked doors, and what subtle cracks do attackers, and careless scripts, slip through?**
 
 This chapter covers the exact **filesystem** and **network** isolation rules that separate a leaky toy sandbox from a production coding-agent harness: scoping workspace mounts, shielding sensitive host paths, closing symlink traversal holes, building offline-by-default network cages with HTTP/CONNECT allowlist proxies, and shutting down quiet data-exfiltration channels like DNS and package-manager install hooks.
 
@@ -17,13 +17,13 @@ Think of a secure **cleanroom laboratory** where a chemist works on one specific
 1. **Filesystem Isolation (What is inside the room):**
    - The chemist gets **read-only manuals** on the shelf (system libraries like `/usr`, compilers, Python/Node runtimes). They can read them, never alter them.
    - They get **one workbench tray** they can freely write on (your project workspace) plus a **disposable waste tray** that gets incinerated at the end of the shift (an isolated `/tmp` scratch directory).
-   - Every other filing cabinet in the building—tax records, master keys, personal bank statements (`~/.ssh`, `~/.aws`, browser cookies, `.env` secrets)—is **either not in the room at all or sealed behind a steel door**.
+   - Every other filing cabinet in the building (tax records, master keys, personal bank statements (`~/.ssh`, `~/.aws`, browser cookies, `.env` secrets)) is **either not in the room at all or sealed behind a steel door**.
 2. **Network Isolation (Who can pass notes out of the room):**
    - By default, **there are no windows and no phones in the room** (offline-by-default).
    - If the chemist genuinely needs a reagent from an approved supplier (say, `pypi.org` or `registry.npmjs.org`), they cannot call out directly. They pass a request slip to a **receptionist outside the room** (an **egress filtering proxy**). The receptionist checks the destination against an approved list and blocks everything else.
 
 Two small pieces of vocabulary make the rest of this chapter effortless:
-- **Symlink (Symbolic Link):** A special file that acts like a shortcut pointing to another file or folder elsewhere on the disk (for example, `docs/link` pointing to `/Users/alice/.ssh/id_ed25519`). If a naive check only looks at the *name* `docs/link`, it thinks the file is inside the workspace—even though opening it reads a private key outside!
+- **Symlink (Symbolic Link):** A special file that acts like a shortcut pointing to another file or folder elsewhere on the disk (for example, `docs/link` pointing to `/Users/alice/.ssh/id_ed25519`). If a naive check only looks at the *name* `docs/link`, it thinks the file is inside the workspace, even though opening it reads a private key outside!
 - **Egress:** Any network traffic **leaving** your sandbox toward an external server (as opposed to *ingress*, traffic coming in). For coding agents, **egress control** is where data-theft prevention lives.
 
 ---
@@ -36,8 +36,8 @@ Because **confidentiality breaches only require two ingredients: read access + o
 
 Consider a realistic, everyday sequence in an engineering workflow:
 1. A developer asks an agent to review a pull request or debug an open-source library.
-2. Hidden inside a test fixture or dependency is an indirect prompt injection—or simply a malicious `postinstall` script inside a transitive `npm` package.
-3. If the sandbox allows **broad reads** (so `~/.aws/credentials` or `~/.npmrc` is readable) AND allows **open internet access**, a single line of code can read those secrets and quietly send them to an attacker-controlled server—without ever modifying a single file outside the workspace!
+2. Hidden inside a test fixture or dependency is an indirect prompt injection, or simply a malicious `postinstall` script inside a transitive `npm` package.
+3. If the sandbox allows **broad reads** (so `~/.aws/credentials` or `~/.npmrc` is readable) AND allows **open internet access**, a single line of code can read those secrets and quietly send them to an attacker-controlled server, without ever modifying a single file outside the workspace!
 
 Even worse, **integrity breaches** can happen entirely *inside* the workspace if you don't separate normal source code from executable control files (like `.git/hooks`, `.envrc`, or IDE task definitions).
 
@@ -73,7 +73,7 @@ flowchart LR
     Proxy -->|"Allowed Domain Only"| Internet["Approved Registries & APIs (github.com, pypi.org, registry.npmjs.org)"]
 ```
 
-Look closely at why DNS is on the **Host** side of that diagram! When the sandbox has **zero direct network access** and can only talk to a local proxy over a Unix domain socket (or loopback port), the sandboxed process **cannot even send raw DNS packets** to the internet. Only the trusted host proxy resolves domain names—closing one of the sneakiest data-exfiltration loopholes in security engineering.
+Look closely at why DNS is on the **Host** side of that diagram! When the sandbox has **zero direct network access** and can only talk to a local proxy over a Unix domain socket (or loopback port), the sandboxed process **cannot even send raw DNS packets** to the internet. Only the trusted host proxy resolves domain names: closing one of the sneakiest data-exfiltration loopholes in security engineering.
 
 ---
 
@@ -129,11 +129,11 @@ This is the blind spot that catches almost every first-time harness builder. Eve
 
 - **`.git/hooks/` and `.git/config`**: Writing a `pre-commit` hook or setting `core.fsmonitor` / `core.sshCommand` in `.git/config` causes arbitrary code execution on the host the very next time the human runs `git status` or `git commit`.
 - **Harness configuration files** (`.claude/`, `.codex/`, `.gemini/`, `.cursor/`, `.mcp.json`): If an agent can edit its own permission rules or register a rogue MCP server, it can grant itself full host access on the next turn.
-- **Secret files in the repo** (`.env`, `.env.local`, `.env.production`, `*.pem`, `id_rsa`, `service-account*.json`): Many local projects keep live API keys in `.env`. Consider blocking direct reads of `.env*` by default (or injecting redacted placeholders—see Chapter 25).
+- **Secret files in the repo** (`.env`, `.env.local`, `.env.production`, `*.pem`, `id_rsa`, `service-account*.json`): Many local projects keep live API keys in `.env`. Consider blocking direct reads of `.env*` by default (or injecting redacted placeholders: see Chapter 25).
 - **Auto-executing workspace files** (`.envrc` for `direnv`, `.vscode/tasks.json` with auto-run): Flag edits to these in your approval policy.
 
 > **Prefer Allowlist-by-Mount over Denylist-by-Path Whenever Possible:**
-> On Linux (`bwrap` / containers / microVMs), you don't have to remember every single secret path in `$HOME`—because you simply **never mount `$HOME`**. Only on platforms like macOS Seatbelt (where broad reads are sometimes allowed for toolchain compatibility) do you need a carefully curated deny-read list—and even on macOS, stricter profiles deny all reads under `/Users/<you>` *except* the workspace and specific toolchain directories (like `~/.nvm` or `~/.cargo`).
+> On Linux (`bwrap` / containers / microVMs), you don't have to remember every single secret path in `$HOME`, because you simply **never mount `$HOME`**. Only on platforms like macOS Seatbelt (where broad reads are sometimes allowed for toolchain compatibility) do you need a carefully curated deny-read list, and even on macOS, stricter profiles deny all reads under `/Users/<you>` *except* the workspace and specific toolchain directories (like `~/.nvm` or `~/.cargo`).
 
 ---
 
@@ -152,14 +152,14 @@ Suppose your workspace is `/Users/alice/app`. Look at three classic mistakes:
    - Input: `/Users/alice/app/src/../../../.ssh/id_rsa` → Naive string check sees the prefix `/Users/alice/app/` and allows it!
 3. **Symlink escape:**
    - Inside the repo, someone (or a cloned git commit!) includes a symlink: `ln -s /Users/alice/.ssh/id_ed25519 ./README_LINK`.
-   - `os.path.abspath("/Users/alice/app/README_LINK")` returns `"/Users/alice/app/README_LINK"` — it does **not** follow symlinks!
+   - `os.path.abspath("/Users/alice/app/README_LINK")` returns `"/Users/alice/app/README_LINK"`: it does **not** follow symlinks!
    - When your tool opens that path, the OS quietly follows the symlink right out of the workspace and hands back the private SSH key.
 
 #### The Defensive Pattern: Canonicalize + Boundary Check + Safe Open
 
 To validate paths properly in harness code:
 1. **Resolve every symlink along the path** using `os.path.realpath()` (Python) or `fs.realpathSync()` (Node.js). For a *new* file that doesn't exist yet, resolve its **nearest existing parent directory** with `realpath()` and verify no intermediate component is an escaping symlink.
-2. **Use `Path.is_relative_to(workspace_real)`** (or `os.path.commonpath([workspace_real, target_real]) == workspace_real`)—never plain `startswith()`.
+2. **Use `Path.is_relative_to(workspace_real)`** (or `os.path.commonpath([workspace_real, target_real]) == workspace_real`), never plain `startswith()`.
 3. **Guard against TOCTOU (Time-of-Check to Time-of-Use) races:** What if a background process swaps a legitimate file for a symlink in the microsecond *between* your `realpath()` check and your `open()` call?
    - In high-security tools (and inside OS sandboxes), open directories step-by-step using `openat()` with the `O_NOFOLLOW` flag (or Linux's `openat2()` with `RESOLVE_BENEATH` / `RESOLVE_NO_SYMLINKS`), which instructs the kernel itself to refuse crossing outside the directory file descriptor.
    - And remember: **your OS sandbox (Seatbelt / bwrap / Landlock) is the ultimate backstop**, because the kernel enforces canonical paths atomically at the exact moment of the syscall!
@@ -172,18 +172,18 @@ Giving an AI coding agent unrestricted internet access is like letting an untrus
 
 #### Tier 1: Offline-by-Default (Best for 90% of Coding Tasks)
 
-Most coding work—reading code, refactoring, running unit tests, linting, type-checking, compiling already-installed dependencies—requires **zero internet access**.
+Most coding work (reading code, refactoring, running unit tests, linting, type-checking, compiling already-installed dependencies) requires **zero internet access**.
 - On Linux `bwrap`: `--unshare-all` (without `--share-net`) gives the sandbox an empty network namespace containing only `lo` (loopback). Every outbound TCP, UDP, ICMP, or DNS packet immediately fails with `ENETUNREACH`.
 - On Docker/Podman: `--network=none`.
 - On macOS Seatbelt: omitting `(allow network*)` under `(deny default)` blocks all outbound sockets at the kernel layer.
 
 #### Tier 2: Domain-Allowlisted Egress via a Local Filtering Proxy
 
-What when the agent *genuinely* needs network access—for example, installing a package from `registry.npmjs.org` or `pypi.org`, fetching docs from `docs.python.org`, or querying `api.github.com`?
+What when the agent *genuinely* needs network access, for example, installing a package from `registry.npmjs.org` or `pypi.org`, fetching docs from `docs.python.org`, or querying `api.github.com`?
 
 **Why IP-based firewalls fail here:** Modern developer registries sit behind global CDNs (Cloudflare, Fastly, CloudFront) whose IP addresses change constantly and are shared by thousands of unrelated (and potentially hostile) domains. Blocking or allowing by IP address alone is brittle and overly broad.
 
-**The Solution — Proxy-Mediated Egress Filtering (used by Claude Code `sandbox-runtime`, enterprise proxies, and hardened cloud sandboxes):**
+**The Solution: Proxy-Mediated Egress Filtering (used by Claude Code `sandbox-runtime`, enterprise proxies, and hardened cloud sandboxes):**
 
 1. **Block all direct outbound network** from inside the sandbox (kernel enforced).
 2. **Expose a single local bridge** from the sandbox to a proxy running *outside* the sandbox on the trusted host:
@@ -193,7 +193,7 @@ What when the agent *genuinely* needs network access—for example, installing a
    `HTTP_PROXY=http://127.0.0.1:<port>`, `HTTPS_PROXY=http://127.0.0.1:<port>`, `ALL_PROXY=socks5h://127.0.0.1:<port>`.
 4. **Inspect every destination hostname at the proxy:**
    - For HTTPS traffic, clients send an explicit HTTP **`CONNECT registry.npmjs.org:443 HTTP/1.1`** request before TLS handshaking begins.
-   - The proxy checks `registry.npmjs.org` (and port `443`) against a strict **domain allowlist** (and denies private/metadata IPs like `169.254.169.254` or `127.0.0.1` to prevent SSRF—Server-Side Request Forgery—against cloud metadata or local host services!).
+   - The proxy checks `registry.npmjs.org` (and port `443`) against a strict **domain allowlist** (and denies private/metadata IPs like `169.254.169.254` or `127.0.0.1` to prevent SSRF, Server-Side Request Forgery, against cloud metadata or local host services!).
    - If allowed, the host proxy resolves DNS, opens the upstream TCP connection, and tunnels the encrypted bytes. If denied, the proxy returns `403 Forbidden` and logs the blocked attempt.
 
 | Egress Control Approach | Granularity | Stops Direct IP / Raw Socket Bypass? | Stops DNS Tunneling? | Complexity |
@@ -212,15 +212,15 @@ What when the agent *genuinely* needs network access—for example, installing a
 Once you understand the basics, think like a defensive architect auditing every exit door out of your cleanroom:
 
 1. **DNS Exfiltration (DNS Tunneling):**
-   - *How it happens:* Even if outbound HTTP (ports 80/443) is blocked, if port 53 (UDP/TCP DNS) is left open, a compromised script can encode secret bytes into a subdomain lookup—e.g., looking up `<encoded-secret>.tracker.example`—and the authoritative DNS server for `tracker.example` records the query!
-   - *Defense:* **Never allow direct DNS from inside the sandbox.** Block all direct outbound sockets (including UDP 53) and let the host-side proxy perform DNS resolution only for allowlisted domains (notice `socks5h://`—the `h` tells the client to pass the hostname to the proxy for resolution rather than resolving DNS locally!).
+   - *How it happens:* Even if outbound HTTP (ports 80/443) is blocked, if port 53 (UDP/TCP DNS) is left open, a compromised script can encode secret bytes into a subdomain lookup (e.g., looking up `<encoded-secret>.tracker.example`) and the authoritative DNS server for `tracker.example` records the query!
+   - *Defense:* **Never allow direct DNS from inside the sandbox.** Block all direct outbound sockets (including UDP 53) and let the host-side proxy perform DNS resolution only for allowlisted domains (notice `socks5h://`; the `h` tells the client to pass the hostname to the proxy for resolution rather than resolving DNS locally!).
 
 2. **Allowed-Domain Abuse ("Living off Trusted Sites"):**
    - *How it happens:* Suppose your allowlist permits `github.com` or `api.github.com` so the agent can pull code. If the agent can also `POST` or `git push` to an arbitrary *public* repository or Gist on `github.com`, an attacker can exfiltrate private source code *through an allowlisted domain*!
    - *Defense:* Separate **read-only package/git access** from **write/push access**. For high-security enterprise environments, use a **mirror registry** (like an internal Artifactory/Verdaccio) or a **method/path-aware proxy** that only allows `GET` requests to package registries and restricts `github.com` traffic to your organization's repositories.
 
 3. **Package-Manager Lifecycle Scripts (`postinstall`, `setup.py`, `build.rs`):**
-   - *How it happens:* Running `npm install`, `pip install`, or `cargo build` does not merely download archives—package managers execute arbitrary code shipped inside packages during installation! A typosquatted or compromised package executes immediately during install.
+   - *How it happens:* Running `npm install`, `pip install`, or `cargo build` does not merely download archives; package managers execute arbitrary code shipped inside packages during installation! A typosquatted or compromised package executes immediately during install.
    - *Defense:*
      - Keep `npm install` / `pip install` inside the sandbox (never bypass the sandbox for installs!).
      - Prefer safe install flags when updating lockfiles isn't needed: `npm ci --ignore-scripts`, `pip install --only-binary=:all:` where feasible, and lockfile pinning.
@@ -228,23 +228,23 @@ Once you understand the basics, think like a defensive architect auditing every 
 
 4. **Cloud Metadata Endpoints & Localhost Services (SSRF):**
    - *How it happens:* When your agent runs on a cloud VM (AWS EC2, GCP, Azure), `http://169.254.169.254` serves temporary IAM credentials for the entire VM! Or on a developer laptop, `http://127.0.0.1:8080` might be a local database admin panel or Ollama/Docker daemon.
-   - *Defense:* Your egress proxy must resolve the target hostname to IP address(es) **before connecting** and strictly reject all private, loopback, link-local, and multicast ranges (`127.0.0.0/8`, `10.0.0.0/8`, `169.254.0.0/16`, `172.16.0.0/12`, `192.168.0.0/16`, `::1`, `fe80::/10`, `fc00::/7`)—preventing DNS-rebinding tricks as well!
+   - *Defense:* Your egress proxy must resolve the target hostname to IP address(es) **before connecting** and strictly reject all private, loopback, link-local, and multicast ranges (`127.0.0.0/8`, `10.0.0.0/8`, `169.254.0.0/16`, `172.16.0.0/12`, `192.168.0.0/16`, `::1`, `fe80::/10`, `fc00::/7`), preventing DNS-rebinding tricks as well!
 
 ---
 
 ## 5. How Real Harnesses Do It
 
 - **Claude Code & `@anthropic-ai/sandbox-runtime` (`srt`):** Implements the exact **kernel-blocked direct network + host-side HTTP/SOCKS5 proxy** architecture. Inside the sandbox, direct network access is disabled via Seatbelt (macOS) or `bwrap --unshare-net` + Unix socket bridge (Linux). Outbound requests are routed through the runtime's local proxy, which enforces `allowedDomains` and `deniedDomains`, while filesystem config separates `denyRead`, `allowWrite`, and `denyWrite` paths.
-- **OpenAI Codex CLI:** Defaults to **completely offline** inside `workspace-write` mode—if a command fails because it tried to reach `pypi.org` or `registry.npmjs.org`, the failure is visible and the user can approve a targeted networked command or configure an allowlisted proxy. Inside the writable workspace, `.git/hooks` and `.codex/` are forced read-only to prevent persistence escapes.
+- **OpenAI Codex CLI:** Defaults to **completely offline** inside `workspace-write` mode, if a command fails because it tried to reach `pypi.org` or `registry.npmjs.org`, the failure is visible and the user can approve a targeted networked command or configure an allowlisted proxy. Inside the writable workspace, `.git/hooks` and `.codex/` are forced read-only to prevent persistence escapes.
 - **Gemini CLI:** Pairs workspace-scoped mounts with explicit Seatbelt profile variants: `-open` (network permitted) versus **`-proxied`** (all direct outbound network denied except the configured local proxy port). In Docker/Podman mode, only the active workspace is bind-mounted into the container, naturally isolating the rest of the developer's home directory.
-- **GitHub Copilot Coding Agent / Cloud Eval Harnesses (SWE-bench):** Runs the setup phase (installing dependencies) with tightly allowlisted egress, then **cuts the network completely** or routes all traffic through an allowlist firewall before the autonomous coding loop begins—guaranteeing that unit tests and agent reasoning cannot leak repository contents or cheat by querying external websites.
+- **GitHub Copilot Coding Agent / Cloud Eval Harnesses (SWE-bench):** Runs the setup phase (installing dependencies) with tightly allowlisted egress, then **cuts the network completely** or routes all traffic through an allowlist firewall before the autonomous coding loop begins; guaranteeing that unit tests and agent reasoning cannot leak repository contents or cheat by querying external websites.
 
 ---
 
 ## 6. Common Pitfalls & Failure Modes
 
 1. **Allowing `HTTP_PROXY` without blocking direct outbound sockets.**
-   - *Symptom:* Security audit shows `curl` obeys the proxy, so the team declares victory—until a Python script using `urllib` or a Go binary ignores proxy env vars and connects straight out.
+   - *Symptom:* Security audit shows `curl` obeys the proxy, so the team declares victory, until a Python script using `urllib` or a Go binary ignores proxy env vars and connects straight out.
    - *Fix:* Enforce direct network denial in the OS sandbox (`--unshare-net` on Linux, omitting `(allow network*)` on macOS Seatbelt).
 2. **Allowing `CONNECT` to arbitrary ports or resolved private IPs.**
    - *Symptom:* Your proxy allows `*.example.com`, and an attacker points `internal.example.com` to `169.254.169.254` (cloud metadata) or `127.0.0.1` (your local Postgres/Redis/daemon).

@@ -8,7 +8,7 @@ Every demo AI agent looks brilliant on the happy path: the API responds in two s
 
 Real software engineering is almost **never** the happy path. Networks drop mid-stream. LLM providers return `429 Too Many Requests` or `529 Overloaded`. The model misremembers a filename, writes a syntax error, or gets stubbornly obsessed with running the exact same broken command 25 times in a row while burning through your API budget.
 
-This chapter teaches you how to build a harness that bends without breaking—recovering automatically from transient infrastructure blips, turning tool failures into learning moments for the LLM, and slamming the brakes the moment an agent enters a **doom loop**.
+This chapter teaches you how to build a harness that bends without breaking: recovering automatically from transient infrastructure blips, turning tool failures into learning moments for the LLM, and slamming the brakes the moment an agent enters a **doom loop**.
 
 ---
 
@@ -16,9 +16,9 @@ This chapter teaches you how to build a harness that bends without breaking—re
 
 Imagine you are driving to a friend's house using a GPS navigation app. Along the way, **three totally different kinds of problems** can happen:
 
-1. **The cell tower drops out for 5 seconds (Infrastructure Error):** Nothing is wrong with your route—the phone just lost signal. You don't turn the car around and go home; you calmly wait a few seconds and reconnect.
+1. **The cell tower drops out for 5 seconds (Infrastructure Error):** Nothing is wrong with your route; the phone just lost signal. You don't turn the car around and go home; you calmly wait a few seconds and reconnect.
 2. **A street is closed for construction (Tool Execution Error):** Reconnecting won't fix a brick wall in the road! Instead, the GPS needs to *know* that Main Street is blocked so it can **recalculate a new route** around the block.
-3. **The GPS keeps telling you "Turn left on Main Street" even though you already told it Main Street is closed—three times in a row (Doom Loop):** If you blindly obey, you will circle the same city block until you run out of gas. A sensible driver notices the repetition, stops following the broken loop, and asks a human for directions or picks a completely different strategy.
+3. **The GPS keeps telling you "Turn left on Main Street" even though you already told it Main Street is closed: three times in a row (Doom Loop):** If you blindly obey, you will circle the same city block until you run out of gas. A sensible driver notices the repetition, stops following the broken loop, and asks a human for directions or picks a completely different strategy.
 
 **Error recovery in an agent harness** is simply refusing to treat all three problems the same way:
 - **Retry** transient infrastructure hiccups silently with smart backoff.
@@ -37,14 +37,14 @@ Imagine you are driving to a friend's house using a GPS navigation app. Along th
 In production coding harnesses, failure handling is often the single biggest difference between a "cool prototype" and a tool developers actually trust:
 
 - **Reliability over long horizons:** A 40-turn coding task makes 40+ LLM API calls and 60+ tool calls. Even if each call has a 98% success rate, the chance of *zero* errors across 100 calls is only $0.98^{100} \approx 13\%$. Without graceful recovery, 87% of long tasks would crash!
-- **Self-healing accuracy:** Models frequently miss on the first try (wrong import path, slight indentation mismatch in a diff, missing test flag). Converting that error into an informative `tool_result` lets the model self-correct within 1–2 turns—raising task completion rates dramatically.
+- **Self-healing accuracy:** Models frequently miss on the first try (wrong import path, slight indentation mismatch in a diff, missing test flag). Converting that error into an informative `tool_result` lets the model self-correct within 1–2 turns: raising task completion rates dramatically.
 - **Cost protection:** Every extra turn in a doom loop re-sends the growing conversation history. A stuck agent on a 100,000-token context window can burn millions of tokens in minutes unless a deterministic circuit breaker stops it.
 
 ---
 
 ## 3. The Big Picture
 
-Every error in your harness should be routed through a clear decision tree—separating **provider/network errors** (handled *outside* the conversation) from **tool/logic errors** (fed *into* the conversation) and **behavioral loops** (caught by the loop detector):
+Every error in your harness should be routed through a clear decision tree: separating **provider/network errors** (handled *outside* the conversation) from **tool/logic errors** (fed *into* the conversation) and **behavioral loops** (caught by the loop detector):
 
 ```mermaid
 flowchart TD
@@ -75,14 +75,14 @@ Never lump all exceptions into one `except Exception:` block. Your harness faces
 | Property | Class 1: Infrastructure Errors | Class 2: Tool Execution Errors |
 | :--- | :--- | :--- |
 | **Examples** | HTTP `429` (rate limit), `500/502/503` (server error), `529` (provider overloaded), DNS failure, TCP reset, mid-stream idle timeout. | `FileNotFoundError`, search-replace block didn't match, `pytest` exit code 1, compiler syntax error, invalid JSON argument, permission denied. |
-| **Who is at fault?** | The network, cloud provider, or temporary traffic spike—*not* the LLM's reasoning. | The LLM's hypothesis, parameters, or the current state of the workspace. |
+| **Who is at fault?** | The network, cloud provider, or temporary traffic spike, *not* the LLM's reasoning. | The LLM's hypothesis, parameters, or the current state of the workspace. |
 | **Should it enter chat history?** | **NO.** Never pollute the LLM's context window with `"HTTP 503 Service Unavailable"`. | **YES.** Put it in a `tool_result` block (`is_error: true`) so the model can see what happened and adapt. |
 | **Correct Harness Action** | Retry the exact same request with exponential backoff + jitter (or fail over to a backup model). | Do **not** blindly retry the exact same tool call; return a structured, helpful error message to the LLM. |
 
 #### What about non-retryable API errors (`400`, `401`, `403`, `413`)?
 Not every LLM API error should be retried:
-- **`401 Unauthorized` / `403 Forbidden`:** Bad API key or missing permissions. Retrying 5 times just wastes time—fail fast and tell the user clearly how to fix credentials.
-- **`400 Bad Request` (Context Length Exceeded):** Your prompt is too big for the context window. Don't retry the same payload—trigger **context compaction** (Chapter 10) and then try again with the smaller prompt!
+- **`401 Unauthorized` / `403 Forbidden`:** Bad API key or missing permissions. Retrying 5 times just wastes time: fail fast and tell the user clearly how to fix credentials.
+- **`400 Bad Request` (Context Length Exceeded):** Your prompt is too big for the context window. Don't retry the same payload: trigger **context compaction** (Chapter 10) and then try again with the smaller prompt!
 - **`400 Bad Request` (Schema / Orphan `tool_use` error):** A harness bug in your message array. Surface loudly and fix state (Chapter 06).
 
 ---
@@ -91,7 +91,7 @@ Not every LLM API error should be retried:
 
 When an LLM provider returns `429 Too Many Requests` or `529 Overloaded`, thousands of other clients are hitting the same overloaded server at the exact same moment.
 
-If every client retries immediately in a tight `while` loop, you create a **retry storm** that keeps the provider crushed. Even if every client waits an exact fixed schedule (`1s`, `2s`, `4s`, `8s`), everyone wakes up in synchronized waves—a classic systems failure called the **Thundering Herd problem**.
+If every client retries immediately in a tight `while` loop, you create a **retry storm** that keeps the provider crushed. Even if every client waits an exact fixed schedule (`1s`, `2s`, `4s`, `8s`), everyone wakes up in synchronized waves: a classic systems failure called the **Thundering Herd problem**.
 
 The industry-standard fix has three ingredients:
 1. **Exponential Backoff:** Double the base delay on every failed attempt (`1s → 2s → 4s → 8s → 16s`), capped at a ceiling (`max_delay`, e.g., `60s`) so the user doesn't wait 20 minutes.
@@ -165,19 +165,19 @@ Compare a **bad** tool error with a **great** tool error:
 
 Notice the recipe for an actionable tool error:
 1. **State clearly what failed** (exact file, parameter, or exit code).
-2. **Preserve the highest-signal evidence** (compiler error line, exit code, tail of stderr—truncated so it doesn't blow up context).
+2. **Preserve the highest-signal evidence** (compiler error line, exit code, tail of stderr: truncated so it doesn't blow up context).
 3. **Suggest the concrete next action** (re-read the line range, run `glob`, narrow the test command).
 
 ---
 
 ### 4.4 Detecting Doom Loops (Identical Calls, Oscillating Edits, Thrashing)
 
-A **doom loop** happens when the agent is technically making valid API calls and valid tool calls—nothing is crashing!—yet it is making **zero forward progress**.
+A **doom loop** happens when the agent is technically making valid API calls and valid tool calls, nothing is crashing!, yet it is making **zero forward progress**.
 
 Why do LLMs fall into doom loops?
 - **Tunnel vision:** Once a wrong hypothesis fills the last 10 turns of the context window, the model's attention locks onto its own failed pattern and repeats it.
 - **State-reflection traps:** A tool returns a huge wall of state (like an entire todo list or directory tree) after every call, tricking the model into thinking it still needs to update or inspect it again.
-- **Silent truncation / empty inputs:** A stream stalls mid-tool-call, the harness returns an error for `{}` arguments, and the model tries the exact same giant write again—hitting the exact same stream limit forever.
+- **Silent truncation / empty inputs:** A stream stalls mid-tool-call, the harness returns an error for `{}` arguments, and the model tries the exact same giant write again; hitting the exact same stream limit forever.
 
 Because doom loops come in **four distinct shapes**, a single naive check ("did the last two calls have the same string?") is not enough:
 
@@ -196,7 +196,7 @@ Because doom loops come in **four distinct shapes**, a single naive check ("did 
 
 Detecting a loop is only half the battle. What should the harness *do* when a detector fires?
 
-Jumping straight to `sys.exit(1)` on the first hiccup is harsh—sometimes a gentle tap on the shoulder snaps the model right out of its rut! Production harnesses use a **three-tier escalation ladder**:
+Jumping straight to `sys.exit(1)` on the first hiccup is harsh, sometimes a gentle tap on the shoulder snaps the model right out of its rut! Production harnesses use a **three-tier escalation ladder**:
 
 #### Tier 1: Soft Intervention — The Corrective Nudge (e.g., at 3 repeats)
 When the detector trips its **warning threshold**, keep the loop alive for one more try, but **inject a crisp meta-instruction** right after the tool result to break the model's tunnel vision:
@@ -244,14 +244,14 @@ Never silently fail, and never burn infinite money trying to "heroically" guess 
 
 1. **Ignoring `tool_use_id` normalization (or hashing the wrong thing):**
    - *Symptom:* Your loop detector never triggers because every call includes a unique `tool_use_id` or timestamp, or triggers *falsely* on legitimate repeated `read_file` pagination calls with different `start_line` offsets.
-   - *Fix:* Hash `(tool_name, canonical_sorted_json(arguments))`—include the arguments (`start_line`, `end_line`), exclude metadata (`tool_use_id`, timestamps).
+   - *Fix:* Hash `(tool_name, canonical_sorted_json(arguments))`; include the arguments (`start_line`, `end_line`), exclude metadata (`tool_use_id`, timestamps).
 
 2. **Cross-message filtering bugs in loop detection:**
    - *Symptom:* Your detector only checks "are the last 3 items in `messages` identical tool calls?" Because the model emits a short text thought (`"Let me try that again..."`) between tool calls, the tool calls are never adjacent in raw content blocks, so the detector is completely blind!
    - *Fix:* Maintain a dedicated **tool-call history ring buffer** containing *only* tool invocations and their normalized error outcomes, independent of interleaved assistant prose.
 
 3. **Counting `429` retries against tool error limits (or appending `429` into chat history):**
-   - *Symptom:* A 15-second API rate-limit spike trips the agent's error circuit breaker and aborts a perfectly healthy coding task—or fills the chat history with `"API Error 429"` messages that confuse the LLM.
+   - *Symptom:* A 15-second API rate-limit spike trips the agent's error circuit breaker and aborts a perfectly healthy coding task, or fills the chat history with `"API Error 429"` messages that confuse the LLM.
    - *Fix:* Keep infrastructure retry counters completely isolated inside the LLM client transport layer.
 
 4. **Retrying non-idempotent side effects on timeout:**
@@ -477,7 +477,7 @@ if __name__ == "__main__":
 <details>
 <summary>Show Answer</summary>
 
-**No!** HTTP `429` is a transient infrastructure error—the model cannot "fix" a provider rate limit, and injecting transport noise into the conversation wastes tokens, breaks prompt-cache prefixes, and confuses the model. Retry silently in the transport layer using exponential backoff with jitter and the `Retry-After` header.
+**No!** HTTP `429` is a transient infrastructure error: the model cannot "fix" a provider rate limit, and injecting transport noise into the conversation wastes tokens, breaks prompt-cache prefixes, and confuses the model. Retry silently in the transport layer using exponential backoff with jitter and the `Retry-After` header.
 </details>
 
 **2. Why does adding random "jitter" to exponential backoff matter when retrying LLM APIs?**
@@ -487,7 +487,7 @@ if __name__ == "__main__":
 Without jitter, all clients that failed during a brief outage sleep for the exact same intervals (`1s`, `2s`, `4s`) and slam the recovering API in synchronized waves (the **Thundering Herd** problem), causing cascading `429`/`529` failures. Full jitter spreads retries smoothly across time.
 </details>
 
-**3. Why does a loop detector that simply checks "were the last 3 tool calls identical?" fail on real coding agents—and what are two ways it fails?**
+**3. Why does a loop detector that simply checks "were the last 3 tool calls identical?" fail on real coding agents, and what are two ways it fails?**
 <details>
 <summary>Show Answer</summary>
 
@@ -500,7 +500,7 @@ It fails in two directions:
 <details>
 <summary>Show Answer</summary>
 
-LLMs suffer from in-context tunnel vision: seeing their own repeated failed attempts in recent turns biases them to repeat the pattern. A clear, explicit harness warning injected into the conversation breaks that pattern and prompts the model to step back, inspect reality, and try a genuinely different strategy—often recovering without needing human intervention.
+LLMs suffer from in-context tunnel vision: seeing their own repeated failed attempts in recent turns biases them to repeat the pattern. A clear, explicit harness warning injected into the conversation breaks that pattern and prompts the model to step back, inspect reality, and try a genuinely different strategy, often recovering without needing human intervention.
 </details>
 
 ---

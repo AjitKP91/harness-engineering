@@ -2,9 +2,9 @@
 
 > **A zero-to-mastery, human-friendly textbook on how modern AI coding agents actually work under the hood.**
 >
-> *Currency note (verified as of November 2026): Architectural principles in this guide are foundational and evergreen; vendor-specific API endpoints, CLI flags, environment variables, and protocol details reflect 2025–2026 releases and evolve rapidly—always check your provider's latest reference docs before shipping.*
+> *Currency note (verified as of November 2026): Architectural principles in this guide are foundational and evergreen; vendor-specific API endpoints, CLI flags, environment variables, and protocol details reflect 2025–2026 releases and evolve rapidly; always check your provider's latest reference docs before shipping.*
 
-If you have ever wondered how tools like Claude Code, OpenAI's Codex CLI, Gemini CLI, OpenCode, or Aider actually turn a text-predicting language model into an agent that can read repositories, edit files safely, run tests, spawn helper agents, and work for hours without losing its mind—you are in the right place.
+If you have ever wondered how tools like Claude Code, OpenAI's Codex CLI, Gemini CLI, OpenCode, or Aider actually turn a text-predicting language model into an agent that can read repositories, edit files safely, run tests, spawn helper agents, and work for hours without losing its mind: you are in the right place.
 
 The secret is not just a smarter AI model. It is **the harness**: the software wrapped around the model.
 
@@ -98,6 +98,7 @@ The secret is not just a smarter AI model. It is **the harness**: the software w
 38. [Telemetry, Tracing & Token/Cost Accounting](./07-reliability-and-evaluation/38-telemetry-tracing-and-token-cost-accounting.md)
 39. [Model Routing & Rate-Limit Fallbacks](./07-reliability-and-evaluation/39-model-routing-and-rate-limit-fallbacks.md)
 40. [Agent Evaluation Harnesses & Benchmarks](./07-reliability-and-evaluation/40-agent-evaluation-harnesses-and-benchmarks.md)
+41. [Putting It All Together: End-to-End Technical Walk-Through](./07-reliability-and-evaluation/41-putting-it-all-together-end-to-end-walkthrough.md)
 
 ### Reference
 - [Plain-English Glossary](./GLOSSARY.md)

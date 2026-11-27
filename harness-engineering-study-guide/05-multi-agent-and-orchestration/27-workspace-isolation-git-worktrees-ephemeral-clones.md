@@ -4,7 +4,7 @@
 
 # 27. Workspace Isolation (Git Worktrees / Ephemeral Clones)
 
-In Chapter 26, we solved **memory collisions** by giving every subagent its own isolated context window. That works seamlessly when three read-only researcher subagents inspect your repository at the same time—reading files concurrently is safe.
+In Chapter 26, we solved **memory collisions** by giving every subagent its own isolated context window. That works seamlessly when three read-only researcher subagents inspect your repository at the same time: reading files concurrently is safe.
 
 Now imagine you spawn **two coding subagents** in parallel:
 - **Agent A** is asked to refactor the authentication middleware and run `pytest`.
@@ -12,7 +12,7 @@ Now imagine you spawn **two coding subagents** in parallel:
 
 If both agents run inside `/Users/you/projects/my-app`, chaos erupts within ten seconds. Agent A edits `config.py`, Agent B overwrites `config.py` with an older version, Agent B runs `git checkout -b billing-v2` right underneath Agent A's feet, Agent A runs `git commit` and accidentally commits half of Agent B's broken migration, and both test suites crash fighting over port `3000` and `.git/index.lock`.
 
-Context isolation separates **brains**. **Workspace isolation** separates **hands and workbenches**—giving each concurrent editing agent its own independent copy of the repository on disk so parallel writers can never corrupt each other or trample the human developer's active work.
+Context isolation separates **brains**. **Workspace isolation** separates **hands and workbenches**: giving each concurrent editing agent its own independent copy of the repository on disk so parallel writers can never corrupt each other or trample the human developer's active work.
 
 ---
 
@@ -20,8 +20,8 @@ Context isolation separates **brains**. **Workspace isolation** separates **hand
 
 Picture two line chefs preparing two different dishes during a dinner rush.
 
-- **One shared cutting board (Shared Directory):** Chef A is slicing strawberries for dessert while Chef B is chopping raw garlic on the exact same board—and reaching for the exact same chef's knife. Within seconds, the strawberries taste like garlic, someone drops a bowl, and nobody knows whose ingredients belong to which plate.
-- **Separate prep stations drawing from one pantry (Git Worktrees / Ephemeral Clones):** Both chefs pull ingredients from the **same central pantry** (the shared `.git/objects` commit history), so you don't need to buy two refrigerators or duplicate 5 gigabytes of pantry stock. Yet each chef stands at their **own clean steel counter** (an isolated working directory and branch). Chef A finishes dessert, Chef B finishes the entrée, and at the end of the rush the head chef inspects each plate cleanly before combining them for service—or tosses a ruined plate in the bin without contaminating the rest of the kitchen.
+- **One shared cutting board (Shared Directory):** Chef A is slicing strawberries for dessert while Chef B is chopping raw garlic on the exact same board, and reaching for the exact same chef's knife. Within seconds, the strawberries taste like garlic, someone drops a bowl, and nobody knows whose ingredients belong to which plate.
+- **Separate prep stations drawing from one pantry (Git Worktrees / Ephemeral Clones):** Both chefs pull ingredients from the **same central pantry** (the shared `.git/objects` commit history), so you don't need to buy two refrigerators or duplicate 5 gigabytes of pantry stock. Yet each chef stands at their **own clean steel counter** (an isolated working directory and branch). Chef A finishes dessert, Chef B finishes the entrée, and at the end of the rush the head chef inspects each plate cleanly before combining them for service, or tosses a ruined plate in the bin without contaminating the rest of the kitchen.
 
 **What breaks without workspace isolation?**
 - **Silent file clobbering:** Two agents editing overlapping or adjacent files overwrite each other's patches mid-turn.
@@ -35,9 +35,9 @@ Picture two line chefs preparing two different dishes during a dinner rush.
 
 Workspace isolation is the single unlock that turns parallel coding agents from a toy demo into a daily engineering superpower:
 
-- **True Write Parallelism:** You can run 3–5 implementation subagents simultaneously on independent features, migrations, or bug fixes—cutting a 40-minute sequential backlog down to 10 minutes.
+- **True Write Parallelism:** You can run 3–5 implementation subagents simultaneously on independent features, migrations, or bug fixes; cutting a 40-minute sequential backlog down to 10 minutes.
 - **Zero-Risk Experimentation ("Best-of-N" & Sandboxed Tries):** Want to try two competing architectural fixes and keep whichever passes benchmarks cleanest? Spin up two isolated workspaces, run both agents, compare diffs, merge the winner, and delete the loser in one second.
-- **Clean Human Review:** Every subagent's output lands on its own branch with a crystal-clear `git diff main..agent/task-123`—never mixed with your local edits or another agent's experiments.
+- **Clean Human Review:** Every subagent's output lands on its own branch with a crystal-clear `git diff main..agent/task-123`, never mixed with your local edits or another agent's experiments.
 - **Safe Background Execution:** Developers can keep coding normally in their IDE while background agents work silently in hidden worktrees (`~/.codex/worktrees/`, `.claude/worktrees/`, etc.) without touching a single file in the main folder.
 
 ---
@@ -81,13 +81,13 @@ flowchart TD
 
 To design rock-solid isolation, it helps to see all **five collision surfaces** that break when two agents share one directory:
 
-1. **Working-Tree Race (Lost Updates):** Agent A reads `routes.ts` at time `t=0`, thinks for 4 seconds, and patches lines 10–15. Meanwhile at `t=2`, Agent B inserted 20 lines at the top of `routes.ts`. Even with stale-read checks (Chapter 14), agents waste turns retrying—and without them, edits silently corrupt files.
+1. **Working-Tree Race (Lost Updates):** Agent A reads `routes.ts` at time `t=0`, thinks for 4 seconds, and patches lines 10–15. Meanwhile at `t=2`, Agent B inserted 20 lines at the top of `routes.ts`. Even with stale-read checks (Chapter 14), agents waste turns retrying, and without them, edits silently corrupt files.
 2. **Git Index & Branch Contention:** Git protects its staging area with a single `.git/index.lock` file. Two parallel agents running `git status`, `git add`, or `git commit` race on that lockfile. Worse, if Agent B switches branches (`git checkout`), every file under Agent A's feet instantaneously changes!
-3. **Cross-Contaminated Test Runs:** Agent A introduces a temporary TypeScript error while refactoring `auth.ts`. At the same instant, Agent B runs `npm test` to check `billing.ts`—the whole compiler fails on `auth.ts`! Agent B reads the error, gets confused, and tries to "fix" `auth.ts` too.
+3. **Cross-Contaminated Test Runs:** Agent A introduces a temporary TypeScript error while refactoring `auth.ts`. At the same instant, Agent B runs `npm test` to check `billing.ts`: the whole compiler fails on `auth.ts`! Agent B reads the error, gets confused, and tries to "fix" `auth.ts` too.
 4. **Build Artifact & Package Manager Collisions:** Agent A runs `npm install zod` while Agent B runs `npm test`, or two Rust agents run `cargo test` writing to the same `target/` directory simultaneously.
 5. **Runtime Environment Collisions:** Both agents launch a dev server on hardcoded port `3000`, write to `./test.sqlite`, or mutate `.env` in place.
 
-Workspace isolation eliminates collisions #1, #2, and #3 immediately—and with smart workspace bootstrapping (Section 4.4), eliminates #4 and #5 too.
+Workspace isolation eliminates collisions #1, #2, and #3 immediately, and with smart workspace bootstrapping (Section 4.4), eliminates #4 and #5 too.
 
 ---
 
@@ -145,13 +145,13 @@ Notice why this is so clever for parallel agents:
 
 ### 4.3 Copy-on-Write Clones vs. Full Clones vs. Git Worktrees
 
-`git worktree add` is fast for source code, yet it has one major real-world snag: **it only checks out Git-tracked files**. It leaves behind everything in `.gitignore`—such as a 1.5 GB `node_modules/` folder, a Python `.venv/`, compiled Rust `target/` crates, or local `.env` files. Running `npm ci` from scratch inside every ephemeral agent worktree can waste 60–180 seconds and gigabytes of SSD space!
+`git worktree add` is fast for source code, yet it has one major real-world snag: **it only checks out Git-tracked files**. It leaves behind everything in `.gitignore`, such as a 1.5 GB `node_modules/` folder, a Python `.venv/`, compiled Rust `target/` crates, or local `.env` files. Running `npm ci` from scratch inside every ephemeral agent worktree can waste 60–180 seconds and gigabytes of SSD space!
 
 This is where **Copy-on-Write (CoW) filesystem clones** shine.
 
 #### What Is Copy-on-Write (Plain English)?
 
-Normally, copying a 2 GB directory reads 2 GB of bytes from your SSD and writes 2 GB of new bytes—taking several seconds and doubling your disk usage.
+Normally, copying a 2 GB directory reads 2 GB of bytes from your SSD and writes 2 GB of new bytes: taking several seconds and doubling your disk usage.
 
 Modern filesystems support **block-level cloning (Copy-on-Write)**:
 - Instead of copying actual file bytes, the operating system simply creates new directory entries pointing to the **exact same physical disk blocks**.
@@ -160,7 +160,7 @@ Modern filesystems support **block-level cloning (Copy-on-Write)**:
 
 #### Platform Commands for CoW Cloning
 
-- **macOS (APFS — Apple File System):** Uses the `-c` flag (`clonefile(2)` syscall):
+- **macOS (APFS: Apple File System):** Uses the `-c` flag (`clonefile(2)` syscall):
   ```bash
   cp -cR /path/to/source /path/to/clone
   ```
@@ -181,7 +181,7 @@ Modern filesystems support **block-level cloning (Copy-on-Write)**:
 | **Full `git clone` (local/remote)** | 5–120+ sec | Full repo + fresh deps | **No** | Completely isolated | Cross-machine / remote cloud sandboxes where no local filesystem is shared. |
 | **Container / MicroVM + OverlayFS** | 0.5–5 sec (warm image) | ~0 MB (upper layer only) | **Yes** (baked into base image) | Completely isolated (kernel boundary) | Untrusted code, CI/cloud parallel fleets, strongest security isolation (Ch. 21). |
 
-> **Hidden win of CoW directory clones:** `git worktree add` always checks out a **committed** Git revision (like `HEAD`), which means it does *not* include your uncommitted local edits unless you stash or create a temporary commit snapshot. A CoW clone of the workspace captures the *exact* byte-for-byte state of the directory—including uncommitted work and pre-warmed caches—in under a second!
+> **Hidden win of CoW directory clones:** `git worktree add` always checks out a **committed** Git revision (like `HEAD`), which means it does *not* include your uncommitted local edits unless you stash or create a temporary commit snapshot. A CoW clone of the workspace captures the *exact* byte-for-byte state of the directory, including uncommitted work and pre-warmed caches, in under a second!
 
 ---
 
@@ -191,7 +191,7 @@ Even with isolated directories, real repositories break in subtle ways unless yo
 
 #### 1. Bootstrapping Dependencies & Untracked Files
 When creating a fresh `git worktree`, agents immediately fail `npm test` or `pytest` if `node_modules/`, `.venv/`, or `.env.local` are missing. Harnesses solve this via a **workspace setup hook** (for example, `.cursor/worktrees.json` or a harness bootstrapper):
-- **CoW-clone heavy dependency folders** (`cp -cR main/node_modules wt/node_modules`) — instant and isolated so if Agent A runs `npm install foo`, it doesn't mutate Main's `node_modules`.
+- **CoW-clone heavy dependency folders** (`cp -cR main/node_modules wt/node_modules`): instant and isolated so if Agent A runs `npm install foo`, it doesn't mutate Main's `node_modules`.
 - **Use content-addressable package managers** (`pnpm`, `uv`, `yarn berry`) whose global store already hardlinks or reflinks packages in seconds.
 - **Copy safe config templates** (e.g., `.env.test` or `.npmrc`), while respecting secret-isolation rules from Chapter 25 (never blindly copy production `.env` secrets into an untrusted sandbox!).
 - **Beware Python `.venv` hardcoded shebangs!** A `.venv/bin/pytest` script often starts with `#!/Users/dev/main-repo/.venv/bin/python` (an absolute path!). If you CoW-clone `.venv` into a new path, invoking `.venv/bin/pytest` directly may secretly execute Main's interpreter or fail imports unless you run `uv sync --offline` or update `VIRTUAL_ENV`.
@@ -269,7 +269,7 @@ Workspace isolation via Git worktrees became a defining feature of 2025–2026 c
 2. **Forgetting Untracked Dependencies & Configs:** A brand-new `git worktree` has no `node_modules/`, `.venv/`, or `.env.test`. The agent runs `npm test`, sees `command not found: vitest`, and wastes 5 turns reinstalling packages or "fixing" `package.json`. **Fix:** Run a deterministic workspace bootstrapper (CoW-cloning deps or running offline `pnpm`/`uv` sync) *before* starting the subagent's first LLM turn.
 3. **Symlinking Mutable Build Outputs Across Worktrees:** Symlinking `node_modules/` (when an agent might run `npm install`) or `.next/` / `target/` between two active worktrees causes bizarre, non-deterministic corruption. **Fix:** Use **Copy-on-Write clones** (which share disk blocks safely yet diverge cleanly on write) instead of symlinks for anything mutable.
 4. **Cross-Volume CoW Failure (`EXDEV`):** Running `cp -cR` on macOS when the repo is on `/Users/...` and the destination is on a different volume or RAM disk fails with `Cross-device link`. **Fix:** Place ephemeral worktrees on the **same filesystem/volume** as the source repo (e.g., `~/.harness/worktrees/` or `<repo-parent>/.worktrees/`), and always code a graceful fallback to standard copy or package-manager install.
-5. **Assuming Clean Textual Merge = Working Code:** Two agents edit different files (`types.ts` and `handler.ts`). `git merge` succeeds with zero conflict markers—and breaks the TypeScript build! **Fix:** Treat **semantic integration testing** (running build + tests on the merged tree before finalizing) as mandatory.
+5. **Assuming Clean Textual Merge = Working Code:** Two agents edit different files (`types.ts` and `handler.ts`). `git merge` succeeds with zero conflict markers, and breaks the TypeScript build! **Fix:** Treat **semantic integration testing** (running build + tests on the merged tree before finalizing) as mandatory.
 6. **Disk-Space Leaks from Crashed Agents:** If a harness crashes before calling `git worktree remove`, every abandoned worktree holds checked-out files, build outputs, and a registered branch ref in `.git/worktrees/`. After 50 runs, a developer's laptop loses 40 GB of SSD space! **Fix:** Tag every ephemeral workspace with metadata (`session_id`, `pid`, `created_at`) and run automatic pruning on startup and shutdown.
 
 ---
@@ -423,7 +423,7 @@ class WorkspaceManager:
 
 Try walking through how clean this lifecycle is:
 1. Parent calls `ws = manager.create()` → takes under a second, gives the subagent `ws.path` and `PORT=ws.port`.
-2. Subagent edits files, runs tests, and commits to `ws.branch`—never touching `repo_root`.
+2. Subagent edits files, runs tests, and commits to `ws.branch`, never touching `repo_root`.
 3. Parent calls `is_clean, info = manager.check_merge_clean(ws)` → knows whether integration will conflict *before* touching the user's working directory.
 4. Parent merges (or opens a PR), runs final integration tests, and calls `manager.cleanup(ws)` to leave zero clutter behind.
 
@@ -434,7 +434,7 @@ Try walking through how clean this lifecycle is:
 ### Key Takeaways
 - **Context isolation is not enough for parallel writers**: concurrent agents modifying the same directory collide on files, `.git/index.lock`, builds, and TCP ports.
 - **`git worktree` splits shared history from isolated state**: all worktrees share `.git/objects/` and `.git/refs/` while isolating working files, `HEAD`, and `index` under `.git/worktrees/<id>/`.
-- **Copy-on-Write clones (`cp -cR` on APFS, `cp --reflink=auto -R` on Btrfs/XFS)** duplicate multi-gigabyte `node_modules/` or whole workspaces in milliseconds at zero initial disk cost—diverging safely only when written.
+- **Copy-on-Write clones (`cp -cR` on APFS, `cp --reflink=auto -R` on Btrfs/XFS)** duplicate multi-gigabyte `node_modules/` or whole workspaces in milliseconds at zero initial disk cost: diverging safely only when written.
 - **Isolate runtime side effects too**: bootstrap untracked configs safely, never symlink mutable build directories across concurrent agents, and assign dynamic ports/temp DBs per workspace.
 - **Integrate with `git merge-tree` + semantic testing**, and always run automatic cleanup and orphan pruning so crashed sessions never fill the developer's SSD.
 
@@ -449,13 +449,13 @@ The linked worktree's <code>.git</code> file points to <code>&lt;main-repo&gt;/.
 **2. Why is Copy-on-Write cloning (`cp -cR` / `cp --reflink=auto`) dramatically safer than symlinking `node_modules/` or `target/` between two parallel agent worktrees?**
 <details>
 <summary>Show Answer</summary>
-A symlink points both workspaces to the exact same mutable files—if Agent A runs <code>npm install</code> or compiles into <code>target/</code>, it mutates or deletes files underneath Agent B's active test run. A Copy-on-Write clone shares the underlying disk blocks initially (taking milliseconds and 0 extra bytes), yet the instant either agent modifies a file, the filesystem allocates new blocks exclusively for the writer—giving both speed and complete write isolation.
+A symlink points both workspaces to the exact same mutable files, if Agent A runs <code>npm install</code> or compiles into <code>target/</code>, it mutates or deletes files underneath Agent B's active test run. A Copy-on-Write clone shares the underlying disk blocks initially (taking milliseconds and 0 extra bytes), yet the instant either agent modifies a file, the filesystem allocates new blocks exclusively for the writer, giving both speed and complete write isolation.
 </details>
 
 **3. Suppose Agent A and Agent B work in separate Git worktrees, and `git merge-tree` reports zero merge conflicts when combining their branches. Can you safely skip re-running tests on the merged result?**
 <details>
 <summary>Show Answer</summary>
-No! Git only detects <em>textual</em> conflicts (overlapping line edits in the same file). It cannot detect <em>semantic</em> conflicts—for example, Agent A changing a function's signature in <code>auth.ts</code> while Agent B adds a brand-new call using the old signature in <code>checkout.ts</code>. You must always run the compiler and test suite on the integrated tree.
+No! Git only detects <em>textual</em> conflicts (overlapping line edits in the same file). It cannot detect <em>semantic</em> conflicts, for example, Agent A changing a function's signature in <code>auth.ts</code> while Agent B adds a brand-new call using the old signature in <code>checkout.ts</code>. You must always run the compiler and test suite on the integrated tree.
 </details>
 
 **4. Why should a harness's OS sandbox (Chapter 22) restrict write access to `.git/hooks/` and `.git/config` inside linked worktrees?**

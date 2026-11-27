@@ -4,11 +4,11 @@
 
 # 13. Short-Term vs. Long-Term Memory
 
-Close your terminal, open a brand-new coding session tomorrow morning, and ask your agent to run the test suite. Without long-term memory, the agent forgets everything you taught it yesterday—that this repository uses `pnpm` instead of `npm`, that integration tests require a local Docker container on port `5433`, and that you hate verbose comments. You end up repeating the exact same corrections week after week.
+Close your terminal, open a brand-new coding session tomorrow morning, and ask your agent to run the test suite. Without long-term memory, the agent forgets everything you taught it yesterday: that this repository uses `pnpm` instead of `npm`, that integration tests require a local Docker container on port `5433`, and that you hate verbose comments. You end up repeating the exact same corrections week after week.
 
 Yet adding long-term memory naively can be *worse* than having no memory at all. If an agent blindly trusts a stale note from two months ago saying *"Auth uses cookie sessions in `auth.js`"*, after your team migrated to JWTs in `src/auth/jwt.ts`, that "helpful" memory will actively derail the agent!
 
-This chapter shows you how to design long-term memory for a real harness—separating short-term working memory from durable episodic and semantic memory, choosing between transparent Markdown files and vector databases, keeping memories clean and non-contradictory, protecting privacy, and knowing when memory helps versus when it misleads.
+This chapter shows you how to design long-term memory for a real harness: separating short-term working memory from durable episodic and semantic memory, choosing between transparent Markdown files and vector databases, keeping memories clean and non-contradictory, protecting privacy, and knowing when memory helps versus when it misleads.
 
 ---
 
@@ -21,14 +21,14 @@ Imagine hiring the smartest plumber in the city to maintain your house. There is
 - On **Monday**, you tell them: *"The main water shutoff is behind the laundry dryer, and please don't park in the neighbor's driveway."* They do a fantastic job.
 - On **Tuesday**, they arrive smiling, park in the neighbor's driveway, and spend 20 minutes tearing apart the kitchen looking for the shutoff valve.
 
-That is a stateless coding agent with **short-term working memory only**. Everything inside today's conversation (the active context window) works great—until the session ends and the desk gets wiped clean.
+That is a stateless coding agent with **short-term working memory only**. Everything inside today's conversation (the active context window) works great, until the session ends and the desk gets wiped clean.
 
 Now suppose the plumber carries a tidy **field notebook** with one tab per house:
 - **Sticky note on the workbench (Working Memory):** Measurements for the sink pipe they are cutting *right now*. Thrown away once the job is done.
-- **Dated job log (Episodic Memory):** *"March 14 — tried brass compression fitting under kitchen sink; slow drip persisted; replaced with braided steel line."*
+- **Dated job log (Episodic Memory):** *"March 14; tried brass compression fitting under kitchen sink; slow drip persisted; replaced with braided steel line."*
 - **House fact sheet (Semantic Memory):** *"Main shutoff: behind laundry dryer. Pipes: copper. Parking: street only."*
 
-Here is the catch that separates a *great* plumber from a *reckless* one: before turning a wrench, a great plumber checks the notebook **and still looks at the actual pipes in front of them**. If you remodeled the laundry room last month, the pipes on the wall win over the ink in the notebook—and the plumber crosses out the old line and updates the note.
+Here is the catch that separates a *great* plumber from a *reckless* one: before turning a wrench, a great plumber checks the notebook **and still looks at the actual pipes in front of them**. If you remodeled the laundry room last month, the pipes on the wall win over the ink in the notebook, and the plumber crosses out the old line and updates the note.
 
 ---
 
@@ -36,8 +36,8 @@ Here is the catch that separates a *great* plumber from a *reckless* one: before
 
 Real software engineering does not happen in one 10-minute chat. Developers work on the same codebase for months, opening dozens of fresh sessions a week. Good long-term memory improves a harness along four concrete dimensions:
 
-1. **Eliminating "Groundhog Day" Corrections:** When a user corrects an agent once (*"Never mock the database in integration tests—use our testcontainers helper"*), persisting that preference means the user never has to repeat themselves across future sessions.
-2. **Capturing Non-Obvious Tribal Knowledge:** Some critical facts are *not* written in the source code—like *"Staging deploys freeze every Friday after 2 PM"*, *"The legacy billing service lives in a separate repo"*, or *"Our CI runs on Linux ARM64 so don't use x86-only wheels."*
+1. **Eliminating "Groundhog Day" Corrections:** When a user corrects an agent once (*"Never mock the database in integration tests; use our testcontainers helper"*), persisting that preference means the user never has to repeat themselves across future sessions.
+2. **Capturing Non-Obvious Tribal Knowledge:** Some critical facts are *not* written in the source code, like *"Staging deploys freeze every Friday after 2 PM"*, *"The legacy billing service lives in a separate repo"*, or *"Our CI runs on Linux ARM64 so don't use x86-only wheels."*
 3. **Lower Cost & Faster Starts:** Recalling 4–6 crisp facts (~200 tokens) saves the agent from spending 8 turns and 30,000 tokens rediscovering how to run tests or hitting the same environment snag it already debugged last week.
 4. **Trust Through Predictability:** When memory is scoped cleanly, kept fresh, and easy for the developer to inspect or edit, the agent starts feeling like a real teammate who actually learns how you work.
 
@@ -86,7 +86,7 @@ Notice the two most important arrows in the whole diagram:
 
 ### 4.1 Working Memory vs. Episodic Memory vs. Semantic Memory
 
-Borrowing from cognitive science—popularized for AI agents by the **CoALA (Cognitive Architectures for Language Agents)** framework—harness engineers split memory into four clean buckets:
+Borrowing from cognitive science (popularized for AI agents by the **CoALA (Cognitive Architectures for Language Agents)** framework) harness engineers split memory into four clean buckets:
 
 | Memory Type | Plain-English Question | Coding-Agent Example | Where It Lives | Lifespan |
 | :--- | :--- | :--- | :--- | :--- |
@@ -98,8 +98,8 @@ Borrowing from cognitive science—popularized for AI agents by the **CoALA (Cog
 #### Why the Distinction Matters
 
 If you lump episodic and semantic memory into one messy pile, two problems appear immediately:
-- **Episodic memories age fast**—they are tied to a *when* and a *why*. They are gold when someone asks *"Why didn't we use Redis streams?"*, but useless noise when fixing a CSS typo.
-- **Semantic memories should stay compact and current**—if a user says *"Actually, we switched from Jest to Vitest today"*, you should **overwrite** the old semantic fact rather than keeping both *"Uses Jest"* and *"Uses Vitest"* sitting side by side.
+- **Episodic memories age fast**: they are tied to a *when* and a *why*. They are gold when someone asks *"Why didn't we use Redis streams?"*, but useless noise when fixing a CSS typo.
+- **Semantic memories should stay compact and current**: if a user says *"Actually, we switched from Jest to Vitest today"*, you should **overwrite** the old semantic fact rather than keeping both *"Uses Jest"* and *"Uses Vitest"* sitting side by side.
 
 ---
 
@@ -119,7 +119,7 @@ In this design, long-term memory is simply **plain Markdown files sitting on dis
 └── debugging_lessons.md      # Past tricky bugs and verified root causes
 ```
 
-At session startup, the harness injects **only `MEMORY.md`** (the compact index—just like progressive disclosure in Chapter 12!). Each bullet in `MEMORY.md` holds a one-line summary and a pointer to the topic file:
+At session startup, the harness injects **only `MEMORY.md`** (the compact index: just like progressive disclosure in Chapter 12!). Each bullet in `MEMORY.md` holds a one-line summary and a pointer to the topic file:
 
 ```markdown
 # Project Memory Index
@@ -133,7 +133,7 @@ If the user is debugging a webhook failure, the agent reads `debugging_lessons.m
 
 #### Approach 2: Vector / Database Memory (Embeddings + Semantic Retrieval)
 
-What is a **vector embedding** in plain English? An embedding model turns a sentence (like *"Integration tests need Postgres on port 5433"*) into a list of numbers (say, 1,536 decimals) representing its *meaning*. Sentences with similar meanings land near each other mathematically. When a user asks *"Why is my database test refusing connections?"*, the harness converts the user's question into numbers, searches a vector database (like Qdrant, pgvector, or local `sqlite-vec`—often combined with BM25 keyword search or a knowledge graph), and retrieves the top $k$ closest memories.
+What is a **vector embedding** in plain English? An embedding model turns a sentence (like *"Integration tests need Postgres on port 5433"*) into a list of numbers (say, 1,536 decimals) representing its *meaning*. Sentences with similar meanings land near each other mathematically. When a user asks *"Why is my database test refusing connections?"*, the harness converts the user's question into numbers, searches a vector database (like Qdrant, pgvector, or local `sqlite-vec`, often combined with BM25 keyword search or a knowledge graph), and retrieves the top $k$ closest memories.
 
 Systems like **Mem0** and **Zep** provide this as a dedicated memory layer, sometimes pairing vector search with entity-relationship graphs (*"User → prefers → Vitest"*, *"CheckoutService → depends_on → StripeWebhook"*).
 
@@ -142,10 +142,10 @@ Systems like **Mem0** and **Zep** provide this as a dedicated memory layer, some
 | Dimension | File-Based (`MEMORY.md` + Notes) | Vector / Graph Database (e.g., Mem0, `sqlite-vec`) |
 | :--- | :--- | :--- |
 | **Setup & Infra** | Zero (plain text files on disk) | Medium–High (embedding API/model + vector DB) |
-| **Human Inspectability** | **Excellent** — open in any editor, delete a bad line in 2 seconds | **Low** — requires a UI/CLI query tool to see what's stored |
+| **Human Inspectability** | **Excellent**: open in any editor, delete a bad line in 2 seconds | **Low**: requires a UI/CLI query tool to see what's stored |
 | **Scalability** | Great up to ~50–200 notes; degrades if index overflows | Scales to 10,000+ memories across many projects |
 | **Cross-Repo Recall** | Weak (scoped to local folder unless manually searched) | Strong (semantic search spans months and multiple repos) |
-| **Failure Transparency** | Obvious — you can literally read what was loaded | Opaque — silent embedding mismatches can miss key facts or pull noisy false positives |
+| **Failure Transparency** | Obvious: you can literally read what was loaded | Opaque: silent embedding mismatches can miss key facts or pull noisy false positives |
 | **Prompt Cache Impact** | **Cache-friendly** (`MEMORY.md` index is stable across turns) | **Risky if re-queried every turn** (mutating top-of-prompt chunks breaks prefix cache; inject per-turn recalls near the bottom!) |
 | **Best Fit** | Local coding agents (90% of single-repo dev workflows) | Multi-repo org assistants, long-lived personal/enterprise agents |
 
@@ -158,7 +158,7 @@ Systems like **Mem0** and **Zep** provide this as a dedicated memory layer, some
 Storing text is trivial. **Keeping memory accurate over six months is the real engineering challenge.** Every healthy memory pipeline solves four sub-problems:
 
 #### 1. Extraction: Explicit vs. Implicit
-- **Explicit extraction:** The user directly says *"Remember that we always run `ruff check` before committing"* or runs `/remember`. High precision, zero guesswork—always honor this immediately.
+- **Explicit extraction:** The user directly says *"Remember that we always run `ruff check` before committing"* or runs `/remember`. High precision, zero guesswork: always honor this immediately.
 - **Implicit (auto) extraction:** At the end of a turn or session, a lightweight background LLM pass inspects the conversation transcript and asks: *"Did the user correct a mistake, state a durable preference, or reveal a non-obvious environment constraint that will still matter next week?"*
   - **Crucial filter:** Explicitly instruct the extractor to **ignore ephemeral task details** (*"Working on PR #412"*, *"Line 88 of `app.py` had a typo"*).
 
@@ -189,7 +189,7 @@ The four possible actions keep the store razor-sharp:
 - **`ADD`:** Brand-new durable fact not yet recorded.
 - **`UPDATE`:** Refines, merges, or supersedes an existing memory (solving contradictions cleanly!).
 - **`DELETE`:** User explicitly revoked a rule or a fact was proven completely false.
-- **`NOOP`:** Already captured accurately—do nothing.
+- **`NOOP`:** Already captured accurately; do nothing.
 
 #### 3. Staleness & Provenance Metadata
 Every stored memory should carry tiny metadata (for example, YAML frontmatter in a Markdown note or columns in SQLite):
@@ -224,7 +224,7 @@ Memory touches sensitive developer workflows. Get scoping or privacy wrong, and 
 | :--- | :--- | :--- | :--- |
 | **1. Session Scope** | Scratchpad notes, current debugging hypotheses, active checklist | In-memory / `.session/<id>/` | No (deleted or archived when session ends) |
 | **2. Project-Local Scope** | Personal repo notes, local DB ports, machine-specific workarounds | `~/.agent/projects/<repo-id>/memory/` | No (stays strictly on this user's machine) |
-| **3. Shared Team Repo Scope** | Official coding standards, architecture rules, team build commands | `./AGENTS.md` or `./CLAUDE.md` (in Git) | **Yes** — edited deliberately by humans via PR review |
+| **3. Shared Team Repo Scope** | Official coding standards, architecture rules, team build commands | `./AGENTS.md` or `./CLAUDE.md` (in Git) | **Yes**: edited deliberately by humans via PR review |
 | **4. Global User Scope** | Cross-project personal preferences (*"Always explain regexes"*, *"Prefer concise diffs"*) | `~/.agent/memory/` | No (follows the user across all repos) |
 
 > **Never auto-write personal memories into Git-tracked files like `AGENTS.md`!** Developers get furious when an agent silently dirties their `git status` with personal preferences or commits private local machine paths into a shared repository. Keep machine-maintained auto-memory strictly outside the working tree (for example under `~/.agent/projects/<repo-hash>/memory/`).
@@ -247,7 +247,7 @@ This is the single most under-appreciated lesson in harness engineering: **the r
 Duplicating code facts into long-term memory is an anti-pattern. Consider what happens if an agent saves:
 > *"User authentication is handled by `verifyCookie()` in `src/middleware/auth.ts` lines 12–48."*
 
-Two weeks later, a teammate refactors authentication to OAuth tokens in `src/auth/oauth.ts`. Now the agent opens a fresh session, reads that stale memory, and confidently tries to patch a deleted file or insists the app still uses cookies—wasting turns and confusing the user.
+Two weeks later, a teammate refactors authentication to OAuth tokens in `src/auth/oauth.ts`. Now the agent opens a fresh session, reads that stale memory, and confidently tries to patch a deleted file or insists the app still uses cookies: wasting turns and confusing the user.
 
 #### Decision Guide: Should the Harness Persist This?
 
@@ -306,7 +306,7 @@ Different production agents sit at different points on the simplicity-vs-autonom
 ### Pitfall 5: Breaking Prompt Caching With Per-Turn Vector Injection
 - **Symptom:** A harness runs a vector search on *every* user turn and splices fresh top-5 memories into the system prompt at index 0.
 - **Result:** Cache hit rate collapses to 0%, increasing latency and API bills dramatically.
-- **Fix:** Inject stable startup memory (`MEMORY.md`) once at session initialization (or deliver on-demand vector search results as appended `tool_result` blocks at the end of the conversation—never rewrite the top prefix!).
+- **Fix:** Inject stable startup memory (`MEMORY.md`) once at session initialization (or deliver on-demand vector search results as appended `tool_result` blocks at the end of the conversation, never rewrite the top prefix!).
 
 ---
 
@@ -506,7 +506,7 @@ Notice how every safeguard works together in under 150 lines:
 - **Memory has distinct jobs:** *Working memory* is the active context window (short-term RAM); *episodic memory* records past events; *semantic memory* holds durable facts and preferences; *procedural memory* lives in Skills (Ch. 12).
 - **Start with transparent file-based memory (`MEMORY.md` + topic notes):** It requires zero infrastructure, stays cache-friendly, and gives developers full inspectability. Add vector/graph memory (like Mem0 or Letta archival storage) only when you genuinely need large-scale cross-repo semantic recall.
 - **Write hygiene beats raw storage:** Every memory pipeline needs extraction filtering, `ADD`/`UPDATE`/`DELETE`/`NOOP` reconciliation to eliminate contradictions, and provenance/freshness tracking.
-- **Scope and scrub strictly:** Separate personal project-local notes (outside Git), team repo rules (`AGENTS.md` in Git), and global user preferences—and scrub secrets before saving anything.
+- **Scope and scrub strictly:** Separate personal project-local notes (outside Git), team repo rules (`AGENTS.md` in Git), and global user preferences, and scrub secrets before saving anything.
 - **Live code always beats stored memory:** Don't persist volatile code layouts or line numbers. Treat every recalled memory as a helpful hint to verify against the live workspace.
 
 ### Quick Self-Check
@@ -523,7 +523,7 @@ Notice how every safeguard works together in under 150 lines:
    <details>
    <summary>Show Answer</summary>
 
-   Because code changes constantly! The moment anyone refactors `src/auth.ts`, that memory becomes **stale and misleading**, causing the agent to look in the wrong place or assume outdated architecture. The live workspace (queried via `grep` and `read_file`) is already the authoritative, real-time source of truth for code structure. Long-term memory should store things *not* easily derived from reading the code—like user preferences, environment quirks, and organizational rules.
+   Because code changes constantly! The moment anyone refactors `src/auth.ts`, that memory becomes **stale and misleading**, causing the agent to look in the wrong place or assume outdated architecture. The live workspace (queried via `grep` and `read_file`) is already the authoritative, real-time source of truth for code structure. Long-term memory should store things *not* easily derived from reading the code, like user preferences, environment quirks, and organizational rules.
 
    </details>
 

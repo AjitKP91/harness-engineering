@@ -6,7 +6,7 @@
 
 Before an agent can read or patch a single line of code, it faces a much bigger question: **Out of 12,000 files in this repository, which three files actually matter right now?**
 
-If search is slow, noisy, or incomplete, even the smartest LLM on Earth will wander in circles—missing callers during a refactor, duplicating utility functions that already exist, or drowning its context window in third-party `node_modules` junk. This chapter explains the three pillars of codebase search (`glob`, `ripgrep`, and semantic vector indexing), why many top harnesses deliberately favor fast live search over heavy vector databases, and how to rank and format search hits so an LLM reads them effortlessly.
+If search is slow, noisy, or incomplete, even the smartest LLM on Earth will wander in circles: missing callers during a refactor, duplicating utility functions that already exist, or drowning its context window in third-party `node_modules` junk. This chapter explains the three pillars of codebase search (`glob`, `ripgrep`, and semantic vector indexing), why many top harnesses deliberately favor fast live search over heavy vector databases, and how to rank and format search hits so an LLM reads them effortlessly.
 
 ---
 
@@ -14,7 +14,7 @@ If search is slow, noisy, or incomplete, even the smartest LLM on Earth will wan
 
 Imagine walking into a massive university library with 50,000 books and trying to find every mention of *"sourdough starter"* or *"how fermentation works"*. You have three very different tools:
 
-1. **The Floor Map & Call-Number Catalog (`glob`):** Lets you ask *"Show me every book in the `Baking/Bread/` aisle whose title ends in `.recipe`."* You never open a single book—you just scan filenames and directory paths.
+1. **The Floor Map & Call-Number Catalog (`glob`):** Lets you ask *"Show me every book in the `Baking/Bread/` aisle whose title ends in `.recipe`."* You never open a single book; you just scan filenames and directory paths.
 2. **A Superhuman Ctrl+F Machine (`ripgrep`):** Scans the actual printed words of thousands of books in 40 milliseconds and hands you every page containing the exact phrase `StarterTempError` or regex `ferment\w+`. It never guesses and never forgets a brand-new book that was shelved two seconds ago.
 3. **A Conceptual Research Librarian (Semantic / Vector Search):** You don't know the exact words the author used, so you ask: *"Where do we explain what to do when bread dough won't rise in cold kitchens?"* Even if the book says *"ambient temperature sluggish yeast recovery"* and never uses the words *"cold"* or *"rise"*, the librarian understands the **meaning** and points you to the right chapter.
 
@@ -30,7 +30,7 @@ Imagine walking into a massive university library with 50,000 books and trying t
 In real software engineering, **navigation accounts for 40%–60% of all tool calls** in a coding session. Great search tools directly improve:
 
 - **Turn Count & Speed:** Finding the exact file in 2 fast parallel calls (`glob` + `grep`, <100ms total) instead of 12 sequential directory listings saves minutes of LLM round-trip latency.
-- **Recall During Refactors:** Missing one caller of a renamed function breaks production. Deterministic lexical search guarantees 100% recall for literal names—provided your harness clearly reports when results are capped.
+- **Recall During Refactors:** Missing one caller of a renamed function breaks production. Deterministic lexical search guarantees 100% recall for literal names: provided your harness clearly reports when results are capped.
 - **Context Budget Efficiency:** Raw search output is notoriously verbose. Grouping hits by file, supporting `"files_with_matches"` scout mode, and truncating huge lines routinely cuts search token consumption by 70%–90%.
 - **Freshness & Simplicity:** Code changes every few seconds during an agent session. A search layer that stays accurate *immediately* after an edit prevents the agent from reasoning over yesterday's code.
 
@@ -73,7 +73,7 @@ flowchart LR
 
 ### 4.1 File Discovery (`glob`)
 
-A **glob** is a lightweight wildcard pattern for matching file paths—much simpler and safer for models to write than full regular expressions:
+A **glob** is a lightweight wildcard pattern for matching file paths: much simpler and safer for models to write than full regular expressions:
 
 | Pattern | Plain-English Meaning | Example Match |
 | :--- | :--- | :--- |
@@ -84,7 +84,7 @@ A **glob** is a lightweight wildcard pattern for matching file paths—much simp
 
 #### What Makes a Production `glob` Tool Good?
 1. **Automatic Ignore Rules:** Respect `.gitignore`, `.ignore`, and global git excludes *by default*. Even in a directory that isn't a git repo yet, maintain a built-in safety ignore list: `.git/`, `node_modules/`, `dist/`, `build/`, `.next/`, `target/`, `__pycache__/`, `.venv/`, `vendor/`.
-2. **Smart Sorting (Not Just Alphabetical!):** When a repo has 5,000 files and you cap `glob` at 100 results, alphabetical sorting shows `a_legacy_module/...` every time. Sorting by **most recently modified (`mtime` descending)**—or shortest path depth first—surfaces the files the team is actively working on!
+2. **Smart Sorting (Not Just Alphabetical!):** When a repo has 5,000 files and you cap `glob` at 100 results, alphabetical sorting shows `a_legacy_module/...` every time. Sorting by **most recently modified (`mtime` descending)**, or shortest path depth first, surfaces the files the team is actively working on!
 3. **Directory Scoping:** Allow an optional `path` parameter (e.g., `path="packages/billing"`) so the model can narrow down a huge monorepo without crafting complex patterns.
 4. **Clear Result Caps:** Cap at ~100–200 paths per call and explicitly report `"Showing 100 of 1,420 matching files. Pass a narrower path or pattern."`
 
@@ -134,23 +134,23 @@ Lexical search (`ripgrep`) is unbeatable when you know *what string* to look for
 
 > *"Where do we retry failed credit card charges with exponential backoff?"*
 
-Maybe the codebase calls them `MerchantSettlementJob`, `backoff_jitter_ms`, and `reattempt_capture`—zero overlap with the words `"retry"`, `"credit card"`, or `"charge"`. That is where **semantic code search** enters.
+Maybe the codebase calls them `MerchantSettlementJob`, `backoff_jitter_ms`, and `reattempt_capture`: zero overlap with the words `"retry"`, `"credit card"`, or `"charge"`. That is where **semantic code search** enters.
 
 #### How Semantic Code Search Works in Plain English
 
 1. **Chunking (Splitting Code into Meaningful Pieces):**
-   You cannot embed a 2,000-line file as one vector—its meaning gets smeared into mush. And you shouldn't chop files blindly every 500 characters, because that slices functions right in half! Modern indexers use **AST chunking** (powered by Tree-sitter—covered deeply in [Chapter 16](./16-ast-and-language-server-protocol-lsp-integration.md)) to split files cleanly along function, method, and class boundaries (~200–500 tokens per chunk), prepending file path + enclosing class context to each chunk.
+   You cannot embed a 2,000-line file as one vector: its meaning gets smeared into mush. And you shouldn't chop files blindly every 500 characters, because that slices functions right in half! Modern indexers use **AST chunking** (powered by Tree-sitter: covered deeply in [Chapter 16](./16-ast-and-language-server-protocol-lsp-integration.md)) to split files cleanly along function, method, and class boundaries (~200–500 tokens per chunk), prepending file path + enclosing class context to each chunk.
 2. **Embeddings (Turning Meaning into Coordinates):**
-   An **embedding model** converts each code chunk into a list of numbers—a **vector** (for example, 1,024 or 1,536 floats). Chunks with similar *meaning* land close together in this high-dimensional space, measured by **cosine similarity**. When the agent asks *"retry failed credit card charges"*, the harness embeds the query and finds the nearest code vectors in a vector database (like Turbopuffer, Qdrant, pgvector, or a local HNSW index).
+   An **embedding model** converts each code chunk into a list of numbers: a **vector** (for example, 1,024 or 1,536 floats). Chunks with similar *meaning* land close together in this high-dimensional space, measured by **cosine similarity**. When the agent asks *"retry failed credit card charges"*, the harness embeds the query and finds the nearest code vectors in a vector database (like Turbopuffer, Qdrant, pgvector, or a local HNSW index).
 3. **Incremental Sync via Merkle Trees:**
-   Re-embedding 50,000 files every time you save one line would be impossibly slow. Smart harnesses build a **Merkle tree**—a cryptographic hash tree where every file is hashed into a leaf node, and every folder's hash is computed from the hashes of its children. When one file changes, only the hashes along the single branch from that file to the root change. Comparing the local root hash to the server's root hash pinpoints the exact changed files in milliseconds!
+   Re-embedding 50,000 files every time you save one line would be impossibly slow. Smart harnesses build a **Merkle tree**: a cryptographic hash tree where every file is hashed into a leaf node, and every folder's hash is computed from the hashes of its children. When one file changes, only the hashes along the single branch from that file to the root change. Comparing the local root hash to the server's root hash pinpoints the exact changed files in milliseconds!
 4. **Hybrid Search (BM25 + Vector + Reciprocal Rank Fusion):**
-   Pure vector search is famously weak at exact identifiers—ask it for `ERR_4091` or `x_csrf_v2` and it might return `ERR_4092` because the vectors look similar! Pure keyword search (**BM25**, a statistical ranking formula that rewards rare, specific matching terms over common words like `return` or `const`) nails exact identifiers but misses synonyms.
+   Pure vector search is famously weak at exact identifiers: ask it for `ERR_4091` or `x_csrf_v2` and it might return `ERR_4092` because the vectors look similar! Pure keyword search (**BM25**, a statistical ranking formula that rewards rare, specific matching terms over common words like `return` or `const`) nails exact identifiers but misses synonyms.
    **Hybrid search** runs *both* BM25 and vector search in parallel, then merges the two ranked lists using **Reciprocal Rank Fusion (RRF)**:
 
    $$\text{RRF\_score}(d) = \sum_{r \in \{\text{BM25}, \text{Vector}\}} \frac{1}{k + \text{rank}_r(d)}$$
 
-   where $k$ is a smoothing constant (typically `60`) and $\text{rank}_r(d)$ is the 1-based position of chunk $d$ in list $r$. Notice the beauty of RRF: you never have to calibrate incompatible raw scores (BM25 scores like `14.3` vs. cosine similarities like `0.81`)—only ranks matter, and chunks that score well in *both* lists rocket to the top!
+   where $k$ is a smoothing constant (typically `60`) and $\text{rank}_r(d)$ is the 1-based position of chunk $d$ in list $r$. Notice the beauty of RRF: you never have to calibrate incompatible raw scores (BM25 scores like `14.3` vs. cosine similarities like `0.81`): only ranks matter, and chunks that score well in *both* lists rocket to the top!
 
 ---
 
@@ -226,7 +226,7 @@ Search: "verifySignature" (3 matches in 1 file; showing all)
 
 ## 6. Common Pitfalls & Failure Modes
 
-1. **The Minified Bundle Landmine:** A `grep` for `"token"` matches line 1 of `public/vendor/app.min.js`—a 1.2-megabyte single line! Without `--max-columns` or per-line truncation, that single match overflows the tool buffer or burns 300,000 tokens.
+1. **The Minified Bundle Landmine:** A `grep` for `"token"` matches line 1 of `public/vendor/app.min.js`; a 1.2-megabyte single line! Without `--max-columns` or per-line truncation, that single match overflows the tool buffer or burns 300,000 tokens.
    - *Fix:* Enforce `--max-columns 300` (or truncate every output line at 300 chars in your wrapper) and skip `*.min.js`, `*.min.css`, and lockfiles (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`) by default unless explicitly targeted.
 2. **Unescaped Regex Metacharacters:** The model searches for `config["db.host"]` using regex mode; `[` fails to compile or `.` matches every character.
    - *Fix:* Offer a `fixed_strings: true` parameter, and if regex compilation fails (`rg` exit code 2), either return a helpful error suggesting `fixed_strings=true` or automatically fall back to literal matching and note that you did so.
@@ -234,7 +234,7 @@ Search: "verifySignature" (3 matches in 1 file; showing all)
    - *Fix:* Always count total matches (or detect that `rg` had more output) and print an unmissable truncation banner.
 4. **Searching `.git/` or `node_modules/`:** Running `grep` with `--hidden` carelessly includes `.git/objects` or `.git/logs`, returning deleted code from three months ago!
    - *Fix:* Even when searching dotfiles (`.env.example`, `.github/workflows`), explicitly exclude `.git/` with `-g '!.git/'`.
-5. **Stale Vector Index Right After an Edit:** An agent renames `oldHelper` to `newHelper`, then queries semantic search which hasn't re-indexed yet—pulling back obsolete code snippets and confusing the model.
+5. **Stale Vector Index Right After an Edit:** An agent renames `oldHelper` to `newHelper`, then queries semantic search which hasn't re-indexed yet; pulling back obsolete code snippets and confusing the model.
    - *Fix:* Always verify semantic search hits against live disk reads (`read_file`) before citing or editing, and overlay live `ripgrep` for exact symbol verification.
 
 ---

@@ -14,31 +14,53 @@ function configureMermaid(): void {
     securityLevel: 'loose',
     theme: 'base',
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    flowchart: {
+      htmlLabels: true,
+      curve: 'basis',
+      nodeSpacing: 44,
+      rankSpacing: 52,
+      padding: 14,
+      wrappingWidth: 260,
+      useMaxWidth: true,
+    },
+    sequence: {
+      actorMargin: 56,
+      boxMargin: 12,
+      messageMargin: 36,
+      mirrorActors: false,
+      useMaxWidth: true,
+    },
     themeVariables: isDark
       ? {
+          fontSize: '14px',
           background: '#10151e',
-          primaryColor: '#1b2434',
+          primaryColor: '#1a2333',
           primaryTextColor: '#f1ede6',
           primaryBorderColor: '#f59e0b',
-          secondaryColor: '#13242b',
+          secondaryColor: '#13262d',
           secondaryTextColor: '#f1ede6',
           secondaryBorderColor: '#2dd4bf',
-          tertiaryColor: '#1a2130',
+          tertiaryColor: '#1b2232',
           tertiaryTextColor: '#f1ede6',
           lineColor: '#94a3b8',
           textColor: '#f1ede6',
-          mainBkg: '#1b2434',
+          mainBkg: '#1a2333',
           nodeBorder: '#f59e0b',
-          clusterBkg: '#131822',
+          edgeLabelBackground: '#131822',
+          clusterBkg: '#121824',
           clusterBorder: '#334155',
-          actorBkg: '#1b2434',
+          actorBkg: '#1a2333',
           actorBorder: '#2dd4bf',
           actorTextColor: '#f1ede6',
           signalColor: '#f1ede6',
           labelBoxBkgColor: '#1a2130',
           labelTextColor: '#f1ede6',
+          noteBkgColor: '#1e293b',
+          noteTextColor: '#f1ede6',
+          noteBorderColor: '#f59e0b',
         }
       : {
+          fontSize: '14px',
           background: '#f6f3ec',
           primaryColor: '#ffffff',
           primaryTextColor: '#181715',
@@ -52,6 +74,7 @@ function configureMermaid(): void {
           textColor: '#181715',
           mainBkg: '#ffffff',
           nodeBorder: '#c85a17',
+          edgeLabelBackground: '#faf8f4',
           clusterBkg: '#faf8f4',
           clusterBorder: '#d6d3cd',
           actorBkg: '#ffffff',
@@ -60,6 +83,9 @@ function configureMermaid(): void {
           signalColor: '#181715',
           labelBoxBkgColor: '#f1ede4',
           labelTextColor: '#181715',
+          noteBkgColor: '#fef3c7',
+          noteTextColor: '#181715',
+          noteBorderColor: '#c85a17',
         },
   });
 }
@@ -203,11 +229,12 @@ export async function renderMermaidDiagrams(container: HTMLElement): Promise<voi
 
     const zoomBtn = fig.querySelector<HTMLButtonElement>('[data-action="zoom"]');
     const copyBtn = fig.querySelector<HTMLButtonElement>('[data-action="copy"]');
+    const diagramTitle = fig.dataset.diagramTitle || 'Architecture Diagram';
 
     if (zoomBtn && !zoomBtn.dataset.bound) {
       zoomBtn.dataset.bound = '1';
       zoomBtn.addEventListener('click', () => {
-        openDiagramLightbox(stageEl.innerHTML, 'Architecture Diagram');
+        openDiagramLightbox(stageEl.innerHTML, diagramTitle);
       });
     }
 

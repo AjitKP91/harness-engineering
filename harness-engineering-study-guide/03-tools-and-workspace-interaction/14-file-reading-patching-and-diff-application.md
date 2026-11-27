@@ -4,7 +4,7 @@
 
 # 14. File Reading, Patching & Diff Application
 
-Reading and editing files sounds like the easiest part of a coding agent. Every programming language has `read_file` and `write_file` in its standard library—how hard could it be?
+Reading and editing files sounds like the easiest part of a coding agent. Every programming language has `read_file` and `write_file` in its standard library: how hard could it be?
 
 In practice, **file reading and patching are where more coding agents quietly break than almost anywhere else**. A clumsy read tool blows up your context window in two turns. A sloppy edit tool silently corrupts line endings, overwrites a human's unsaved work, triggers "lazy" LLM placeholders (`// ... rest of file ...`), or traps the model in a five-turn retry spiral because of a single missing space.
 
@@ -36,7 +36,7 @@ File I/O sits on the hottest path of every coding session. Getting it right dire
 
 1. **Output Token Cost & Latency:** With modern LLM APIs, **output tokens typically cost 3–5× more than input tokens** and stream at 40–120 tokens per second. Rewriting a 600-line file to fix a 3-line bug takes ~45 seconds and costs thousands of output tokens. A surgical patch takes ~2 seconds and ~80 output tokens.
 2. **Edit Success Rate & Model "Laziness":** Research and benchmarks (notably Aider's refactoring benchmarks) proved that the *exact same model* can double or triple its coding accuracy simply by changing the edit format it is asked to emit. Bad formats invite models to skip code with `// ... existing code ...` comments or miscount diff line numbers.
-3. **Data Integrity:** A coding agent operates on a developer's real workspace—often containing uncommitted work. A single non-atomic write interrupted by `Ctrl+C`, or a stale edit overwriting a file the user just saved, permanently destroys trust in your harness.
+3. **Data Integrity:** A coding agent operates on a developer's real workspace, often containing uncommitted work. A single non-atomic write interrupted by `Ctrl+C`, or a stale edit overwriting a file the user just saved, permanently destroys trust in your harness.
 4. **First-Try Self-Correction:** Even frontier models occasionally miss a tab or supply an ambiguous snippet. When a harness returns a structured, informative error message, models recover on the very next turn >90% of the time instead of spiraling into a doom loop ([Chapter 05](../01-core-loop-and-execution/05-error-recovery-retries-and-infinite-loop-detection.md)).
 
 ---
@@ -66,7 +66,7 @@ flowchart TD
     UpdateState --> ReturnOK["Return compact diff + line summary to LLM"]
 ```
 
-Notice that almost every box in this diagram is **deterministic harness code**—zero extra LLM calls required.
+Notice that almost every box in this diagram is **deterministic harness code**: zero extra LLM calls required.
 
 ---
 
@@ -76,13 +76,13 @@ Notice that almost every box in this diagram is **deterministic harness code**�
 
 Suppose an agent wants to inspect `src/server.ts`, which happens to be 2,400 lines long (or worse, a 3-megabyte bundled JSON fixture). If your `read_file` tool naively returns the entire file:
 
-- You immediately burn ~30,000+ tokens—most of them unrelated to the bug.
+- You immediately burn ~30,000+ tokens: most of them unrelated to the bug.
 - Even if the file fits, **context rot** ([Chapter 09](../02-context-and-memory/09-context-window-budgeting.md)) degrades the model's attention across thousands of irrelevant lines.
 - If the file is a single minified 400,000-character line, a line-count cap alone fails unless you *also* cap characters per line!
 
 Production harnesses design `read_file` with **four protective guardrails**:
 
-1. **Pagination (`offset` and `limit`):** Default to a sensible window—commonly **200 to 2,000 lines** (e.g., 1-based `start_line` and `end_line`, or `offset` + `limit`), along with a hard byte ceiling (e.g., 30–50 KB per call). Always tell the model the total line count and how to read the next page.
+1. **Pagination (`offset` and `limit`):** Default to a sensible window; commonly **200 to 2,000 lines** (e.g., 1-based `start_line` and `end_line`, or `offset` + `limit`), along with a hard byte ceiling (e.g., 30–50 KB per call). Always tell the model the total line count and how to read the next page.
 2. **Line Numbers on Every Line (`cat -n` style):** Prefix every line with its 1-based line number and a consistent delimiter (like `   42 | ` or `   42\t`). Line numbers let the model cite exact locations to the user, request the next paginated slice cleanly, and orient itself inside large files.
 3. **Per-Line Character Cap:** Truncate single lines exceeding ~1,000–2,000 characters (appending `... [truncated 48,210 chars]`) so minified JS, SVGs, or embedded base64 blobs cannot blow up the context window.
 4. **Binary & Special File Detection:** Before decoding text, inspect the first 8 KB for null bytes (`\x00`) or invalid UTF-8 ratio. If it's a PNG, PDF, SQLite database, or compiled binary, return metadata (file type, byte size) instead of gibberish replacement characters (`\ufffd`).
@@ -130,7 +130,7 @@ The model outputs the entire new content of the file via a `write_file(path, con
 #### Format B: Search-and-Replace Blocks (`str_replace` / Aider `SEARCH/REPLACE`)
 The model specifies the exact old snippet to locate and the exact new snippet to replace it with. No line numbers required!
 
-**Variant 1 — Structured JSON Tool (Anthropic `str_replace_based_edit_tool` / Claude Code `Edit`):**
+**Variant 1: Structured JSON Tool (Anthropic `str_replace_based_edit_tool` / Claude Code `Edit`):**
 ```json
 {
   "name": "edit_file",
@@ -142,7 +142,7 @@ The model specifies the exact old snippet to locate and the exact new snippet to
 }
 ```
 
-**Variant 2 — Text Fenced Blocks (Aider `diff` format):**
+**Variant 2: Text Fenced Blocks (Aider `diff` format):**
 ```text
 src/auth/tokens.py
 <<<<<<< SEARCH
@@ -158,7 +158,7 @@ src/auth/tokens.py
 - **Cons:** Must repeat unchanged context lines inside `old_string` *and* `new_string` (small extra output tokens for multi-hunk edits). JSON-escaped strings (`\n`, `\"`) can occasionally cause escaping friction compared to raw text formats, though modern structured-output models handle JSON cleanly.
 
 #### Format C: Context-Anchored Unified Diffs (`udiff` & OpenAI `apply_patch` V4A)
-Standard `git diff` unified diffs have headers like `@@ -42,7 +42,9 @@`. **LLMs are notoriously terrible at arithmetic inside hunk headers**—they routinely write `-42,7` when there are actually 8 lines, causing GNU `patch` to reject the diff.
+Standard `git diff` unified diffs have headers like `@@ -42,7 +42,9 @@`. **LLMs are notoriously terrible at arithmetic inside hunk headers**: they routinely write `-42,7` when there are actually 8 lines, causing GNU `patch` to reject the diff.
 
 Modern agent diff formats solve this by **dropping exact line-number math** and keeping only context anchors (`@@`), space-prefixed unchanged lines, `-` deletions, and `+` additions.
 
@@ -201,9 +201,9 @@ Modern agent diff formats solve this by **dropping exact line-number math** and 
 Why do seemingly simple string replacements fail in real repositories? Four invisible gremlins cause 80% of edit failures:
 
 #### 1. Line Endings (`CRLF` vs. `LF`)
-Windows repositories (and mixed-OS teams) often use `\r\n` (`CRLF` — Carriage Return + Line Feed), while macOS/Linux use `\n` (`LF`). LLMs *always* emit `\n` in JSON tool calls.
+Windows repositories (and mixed-OS teams) often use `\r\n` (`CRLF`: Carriage Return + Line Feed), while macOS/Linux use `\n` (`LF`). LLMs *always* emit `\n` in JSON tool calls.
 - If your harness searches raw file bytes containing `\r\n` for an `old_string` containing `\n`, **every multi-line edit fails!**
-- Conversely, if you normalize the file to `\n` and write `\n` back to disk, you just rewrote every single line of a Windows file—creating a massive 2,000-line fake diff in `git status`.
+- Conversely, if you normalize the file to `\n` and write `\n` back to disk, you just rewrote every single line of a Windows file, creating a massive 2,000-line fake diff in `git status`.
 - **The Fix:** Detect the file's dominant line ending (`\r\n` vs. `\n`) on read, normalize *in memory* to `\n` for matching and replacement, and convert back to the file's original line ending right before writing to disk!
 
 #### 2. Tabs vs. Spaces & Trailing Whitespace
@@ -274,7 +274,7 @@ Most source code is UTF-8 without a Byte Order Mark (BOM), but legacy C#, PowerS
 
 ### 4.5 Designing Helpful Edit Error Messages So the Model Self-Corrects
 
-Remember one of the core principles from [Chapter 05](../01-core-loop-and-execution/05-error-recovery-retries-and-infinite-loop-detection.md): **tool errors are not crashes—they are prompts for the next turn.**
+Remember one of the core principles from [Chapter 05](../01-core-loop-and-execution/05-error-recovery-retries-and-infinite-loop-detection.md): **tool errors are not crashes; they are prompts for the next turn.**
 
 Compare what happens when an edit fails with a lazy error vs. a thoughtfully engineered error:
 
@@ -305,7 +305,7 @@ Notice how showing the **closest matching lines right inside the error message**
 - **OpenAI Codex CLI (`apply_patch` V4A Format):**
   Codex models are post-trained directly on OpenAI's V4A patch grammar (`*** Begin Patch` / `*** Update File:` / `*** Add File:` / `*** Delete File:` / `@@` context anchors). A single `apply_patch` call can create, update, and delete multiple files in one turn without fragile hunk line counts. The local harness parses the envelope, validates paths against directory traversal (`..`), locates context hunks, and reports structured `completed`/`failed` statuses back to the model.
 - **Aider (Multi-Format Benchmarking & Adaptive Selection):**
-  Aider pioneered systematic benchmarking of LLM edit formats. In Aider's famous refactoring benchmark measuring LLM "laziness," switching GPT-4 Turbo from `SEARCH/REPLACE` blocks to unified diffs (`udiff`) jumped its pass rate from **20% to 61%** and cut lazy placeholder comments threefold. Aider dynamically picks the best edit format per model family—using `diff` (`SEARCH/REPLACE`) for Claude models, `udiff` where models excel at diffs, `diff-fenced` for Gemini quirks, and `whole` for smaller local models that struggle with patch syntax.
+  Aider pioneered systematic benchmarking of LLM edit formats. In Aider's famous refactoring benchmark measuring LLM "laziness," switching GPT-4 Turbo from `SEARCH/REPLACE` blocks to unified diffs (`udiff`) jumped its pass rate from **20% to 61%** and cut lazy placeholder comments threefold. Aider dynamically picks the best edit format per model family: using `diff` (`SEARCH/REPLACE`) for Claude models, `udiff` where models excel at diffs, `diff-fenced` for Gemini quirks, and `whole` for smaller local models that struggle with patch syntax.
 - **OpenCode (Cascading Fuzzy Replacer Chain):**
   OpenCode's `edit` tool runs a cascading chain of matchers (`Exact` → `LineTrimmed` → `WhitespaceNormalized` → `IndentationFlexible` → `BlockAnchor` with Levenshtein similarity). While this recovers from minor whitespace slips without a retry turn, OpenCode's real-world issue tracker also highlighted an important cautionary tale: overly permissive similarity thresholds can match a previously edited block with a stale `old_string` and silently revert earlier work, and error messages must accurately reflect what the matcher actually tried.
 
@@ -568,7 +568,7 @@ Notice how clean every responsibility is: `read_file` handles pagination, line t
 1. **Why is calling `open(path, "w")` directly dangerous inside an agent harness, and why must the temporary file in an atomic write live in the *same directory* as the target file?**
    <details>
    <summary>Show Answer</summary>
-   `open(path, "w")` truncates the existing file to 0 bytes immediately before new bytes are written; if the process crashes or is cancelled mid-write, the user's file is destroyed. Writing to a temporary file and calling `os.replace` swaps the directory entry atomically, but POSIX `rename`/`os.replace` only works atomically on the same filesystem/mount point—creating the temp file in `/tmp` can fail with `EXDEV` (cross-device link) if the workspace is on a different disk or volume.
+   `open(path, "w")` truncates the existing file to 0 bytes immediately before new bytes are written; if the process crashes or is cancelled mid-write, the user's file is destroyed. Writing to a temporary file and calling `os.replace` swaps the directory entry atomically, but POSIX `rename`/`os.replace` only works atomically on the same filesystem/mount point, creating the temp file in `/tmp` can fail with `EXDEV` (cross-device link) if the workspace is on a different disk or volume.
    </details>
 
 2. **Why do modern agent diff formats like OpenAI's V4A `apply_patch` omit standard unified-diff hunk line numbers like `@@ -42,7 +42,9 @@`?**

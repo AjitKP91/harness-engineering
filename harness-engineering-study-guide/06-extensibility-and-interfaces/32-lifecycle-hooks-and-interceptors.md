@@ -4,11 +4,11 @@
 
 # 32. Lifecycle Hooks & Interceptors
 
-In Chapter 07, we saw how you can guide an AI agent with instructions in a system prompt or a repo file like `AGENTS.md` or `CLAUDE.md`—for example, *"Always run Prettier after editing TypeScript files, and never edit `.env`."*
+In Chapter 07, we saw how you can guide an AI agent with instructions in a system prompt or a repo file like `AGENTS.md` or `CLAUDE.md`, for example, *"Always run Prettier after editing TypeScript files, and never edit `.env`."*
 
 If you have ever used a coding agent for more than an hour, you already know what happens next: after twenty turns of intense debugging, the model gets tunnel vision, forgets your polite reminder, leaves ugly unformatted code behind, or tries to touch a file you explicitly warned it to leave alone.
 
-**Lifecycle hooks** solve that problem once and for all. Instead of *asking* a probabilistic language model to remember a rule, you attach **deterministic code** directly to specific moments inside the harness loop—before a tool runs, right after an edit finishes, or right when the agent thinks it is done.
+**Lifecycle hooks** solve that problem once and for all. Instead of *asking* a probabilistic language model to remember a rule, you attach **deterministic code** directly to specific moments inside the harness loop, before a tool runs, right after an edit finishes, or right when the agent thinks it is done.
 
 ---
 
@@ -16,10 +16,10 @@ If you have ever used a coding agent for more than an hour, you already know wha
 
 Think of a modern **factory assembly line** (or **airport security**):
 
-- **Prompt instructions** are like posters taped to the factory wall: *"Please wear safety goggles. Please inspect every bolt before shipping."* Posters help a lot—conscientious workers read them—but when someone is tired or rushing, a poster cannot physically stop a mistake.
+- **Prompt instructions** are like posters taped to the factory wall: *"Please wear safety goggles. Please inspect every bolt before shipping."* Posters help a lot, conscientious workers read them, but when someone is tired or rushing, a poster cannot physically stop a mistake.
 - **Lifecycle hooks** are like **automated gates and scanners built directly into the conveyor belt**.
   - Before a package enters the shipping bay, a laser scanner *always* checks its weight (`PreToolUse`). If something is forbidden, the gate physically locks and flashes an exact error message telling the worker what to fix.
-  - Right after a part gets painted, an automated dryer *always* runs for three seconds (`PostToolUse`)—the worker doesn't even have to remember to press a button.
+  - Right after a part gets painted, an automated dryer *always* runs for three seconds (`PostToolUse`): the worker doesn't even have to remember to press a button.
   - When a worker says *"I'm done with this batch!"*, a quality-control station automatically runs a quick checklist before letting the batch leave the floor (`Stop`).
 
 ### What Breaks Without Hooks?
@@ -74,7 +74,7 @@ flowchart TD
     H_Stop -- "Approved (Exit 0)" --> Done(["Yield Control to User"])
 ```
 
-Notice the crucial architectural property in that diagram: **hooks can steer the loop without crashing it.** When a `PreToolUse` or `Stop` hook blocks an action, the harness does not abort the session—it hands the hook's message right back to the LLM as structured feedback so the model can self-correct on its very next turn.
+Notice the crucial architectural property in that diagram: **hooks can steer the loop without crashing it.** When a `PreToolUse` or `Stop` hook blocks an action, the harness does not abort the session; it hands the hook's message right back to the LLM as structured feedback so the model can self-correct on its very next turn.
 
 ---
 
@@ -82,7 +82,7 @@ Notice the crucial architectural property in that diagram: **hooks can steer the
 
 ### 4.1 What Hooks Are (Deterministic Code vs. Prompts)
 
-A **lifecycle hook** (also called an **interceptor**) is a user-configured handler—typically a shell command, local script, in-process function, or HTTP webhook—registered to run automatically whenever the harness emits a specific lifecycle event.
+A **lifecycle hook** (also called an **interceptor**) is a user-configured handler (typically a shell command, local script, in-process function, or HTTP webhook) registered to run automatically whenever the harness emits a specific lifecycle event.
 
 Unlike an **MCP tool** (Chapter 19), which the *LLM chooses* to call when it feels like it, a **hook** is invoked *by the harness itself* whether the model wants it or not.
 
@@ -105,7 +105,7 @@ While exact names vary slightly across harnesses (Claude Code uses `PreToolUse`/
 | **`BeforeModel`** | Right before the harness sends the message array to the LLM API | Yes | Yes (messages / model / tools) | Redact accidental secrets/PII before egress; dynamically inject live diagnostics; route simple prompts to a faster model. |
 | **`PreToolUse`** | After the model requests a tool call, *before* the tool executes | **Yes** | **Yes** (`updatedInput`) | Security gates (block editing lockfiles or `.env`); auto-approve safe read commands; rewrite `npm` to `pnpm` or add `--dry-run`. |
 | **`PostToolUse`** | Immediately after a tool finishes executing | Soft block / steer | Inject `additionalContext` (or filter output) | Run `prettier`/`ruff` on edited files; run targeted type-check and feed errors back to the model; log tool usage. |
-| **`Stop` / `Completion`** | When the LLM stops calling tools (`end_turn`) and tries to hand control back | **Yes** (forces another turn) | Inject continuation feedback | Verification gates: *"Don't finish yet—`pytest` still has 2 failing tests!"*; check that all checklist items are done. |
+| **`Stop` / `Completion`** | When the LLM stops calling tools (`end_turn`) and tries to hand control back | **Yes** (forces another turn) | Inject continuation feedback | Verification gates: *"Don't finish yet; `pytest` still has 2 failing tests!"*; check that all checklist items are done. |
 | **`Notification`** | When the harness emits an alert (permission prompt waiting, idle timeout, completion) | No (observe-only) | No | Trigger macOS/Linux desktop notifications (`osascript`/`notify-send`), play a sound, or send a Slack/Discord ping. |
 
 > **Bonus events in newer harnesses:** Some harnesses also expose **`AfterModel`** (inspect or filter raw LLM responses before tool parsing), **`PermissionRequest`** (programmatically answer approval dialogs), **`UserPromptSubmit`** (validate or enrich a user's prompt right after they press Enter), **`PreCompact`** (save critical state before context compaction), and **`SessionEnd`** (clean up temporary resources and flush telemetry).
@@ -149,7 +149,7 @@ A hook communicates its decision through two channels: **process exit codes** (f
 
 ##### Action A: Observe / Log (Exit Code `0`, Empty `stdout`)
 The hook records an audit entry or triggers a side effect (like a desktop notification) and exits `0`.
-> **Subtle gotcha:** In `PreToolUse`, exiting `0` with no JSON does **not** mean *"auto-approve and bypass the user's permission prompt."* It means *"this hook has no objection—continue to the normal permission policy."*
+> **Subtle gotcha:** In `PreToolUse`, exiting `0` with no JSON does **not** mean *"auto-approve and bypass the user's permission prompt."* It means *"this hook has no objection; continue to the normal permission policy."*
 
 ##### Action B: Block / Deny (Exit Code `2` OR Structured JSON)
 The simplest way to block a dangerous tool call in a 5-line shell script is to **print a clear explanation to `stderr` and exit with status code `2`**:
@@ -184,13 +184,13 @@ For richer control, a hook exits `0` and prints structured JSON to `stdout`:
 ```
 
 Typical `permissionDecision` values are:
-- `"allow"` — explicitly auto-approve this call (skip the interactive user prompt, unless overridden by a higher-precedence deny rule).
-- `"deny"` — block execution and feed `permissionDecisionReason` back to the model.
-- `"ask"` — force an interactive human confirmation dialog even if the command would otherwise be auto-approved.
-- `"defer"` — pause/defer the decision in headless or external approval workflows.
+- `"allow"`: explicitly auto-approve this call (skip the interactive user prompt, unless overridden by a higher-precedence deny rule).
+- `"deny"`: block execution and feed `permissionDecisionReason` back to the model.
+- `"ask"`: force an interactive human confirmation dialog even if the command would otherwise be auto-approved.
+- `"defer"`: pause/defer the decision in headless or external approval workflows.
 
 ##### Action C: Mutate Inputs (`updatedInput`)
-Sometimes you don't want to *reject* the model's tool call—you want to *fix it silently* before it runs. For example:
+Sometimes you don't want to *reject* the model's tool call: you want to *fix it silently* before it runs. For example:
 - Rewriting `npm test` into `pnpm test` in a pnpm monorepo.
 - Injecting `--no-pager` or `--non-interactive` flags so commands don't hang.
 - Redacting a secret token or clamping a dangerous parameter before execution.
@@ -212,10 +212,10 @@ A `PreToolUse` hook returns `updatedInput` inside `hookSpecificOutput`:
 **Important safety detail:** A well-built harness **re-validates `updatedInput` against the tool's JSON Schema** (stripping unknown fields and rejecting type mismatches) and **re-checks sandbox/permission policies** *after* mutation so a buggy or compromised hook cannot sneak an unapproved parameter past the validator.
 
 ##### Action D: Inject Feedback (`additionalContext`) & Auto-Formatting
-In `PostToolUse`, the tool has already finished—you can't un-write a file—but you can **automatically clean it up and whisper immediate feedback into the model's ear**.
+In `PostToolUse`, the tool has already finished, you can't un-write a file, but you can **automatically clean it up and whisper immediate feedback into the model's ear**.
 
 Suppose the agent just edited `src/billing.py`. Your `PostToolUse` hook runs `ruff format` and `ruff check`:
-1. If formatting succeeds and there are zero lint errors, exit `0` silently—the model doesn't waste a single token hearing about it.
+1. If formatting succeeds and there are zero lint errors, exit `0` silently: the model doesn't waste a single token hearing about it.
 2. If `ruff check` finds an unused import or undefined variable, return JSON with `additionalContext` (or exit `2` with `stderr` feedback):
 
 ```json
@@ -227,7 +227,7 @@ Suppose the agent just edited `src/billing.py`. Your `PostToolUse` hook runs `ru
 }
 ```
 
-The harness appends that note directly to the tool result. On the very next turn, the model fixes line 42 automatically—before the human ever sees a broken file!
+The harness appends that note directly to the tool result. On the very next turn, the model fixes line 42 automatically, before the human ever sees a broken file!
 
 ---
 
@@ -242,7 +242,7 @@ Harnesses execute hooks in four main ways, each with clear engineering trade-off
 | **HTTP Webhook (`http`)** | Harness sends an HTTP `POST` with the JSON event payload to a local or remote server and parses the JSON response. | Network-bound (5–500 ms) | Any server stack | Keeps proprietary policy logic & secrets off the developer laptop; fails if offline. | Centralized enterprise compliance, SIEM audit logs, Slack/PagerDuty alerts, remote policy engines. |
 | **LLM-Backed (`prompt` / `agent`)** | Harness sends the event + a short rubric to a fast model (or read-only subagent) that returns a JSON allow/deny verdict. | High (0.5–5+ sec) | Plain English prompt | Costs tokens & adds latency; non-deterministic (use as a second layer, never your only security boundary). | Semantic checks regex can't do: *"Did the agent actually answer all parts of the user's request before stopping?"* |
 
-> **Rule of thumb:** Start with fast **shell command hooks** for 90% of workflows. Reach for **HTTP webhooks** when an enterprise security team needs centralized policy control without distributing scripts to every laptop. Reserve **LLM-backed hooks** for high-value, low-frequency checkpoints like `Stop`—never put an LLM call on every single `Read` tool!
+> **Rule of thumb:** Start with fast **shell command hooks** for 90% of workflows. Reach for **HTTP webhooks** when an enterprise security team needs centralized policy control without distributing scripts to every laptop. Reserve **LLM-backed hooks** for high-value, low-frequency checkpoints like `Stop`, never put an LLM call on every single `Read` tool!
 
 ---
 
@@ -265,7 +265,7 @@ What happens if a webhook server hangs, or a developer writes a `PostToolUse` ho
   - **Security/compliance hooks** (secret scanner, production-deploy blocker) must support **fail closed** (`on_error: "deny"`): if the policy server is unreachable or the validator crashes, block the action rather than silently waving it through.
 
 #### 3. Multiple Hooks: Parallelism & Conflict Resolution
-What if three different `PreToolUse` hooks match the same `Bash` call—one from your personal config, one from the repo, and one from enterprise IT?
+What if three different `PreToolUse` hooks match the same `Bash` call: one from your personal config, one from the repo, and one from enterprise IT?
 - **Read-only / observe hooks** (`PostToolUse` loggers, `Notification`) can safely run **in parallel** to keep latency flat.
 - **Mutating hooks** (`updatedInput`) must run in a **deterministic sequential order** (so Hook B sees Hook A's transformed input, or the harness detects conflicting rewrites).
 - **Combining decisions uses "Most Restrictive Wins":**
@@ -280,7 +280,7 @@ If your personal hook says `"allow"` for `git push`, but your company's enterpri
 This is the #1 bug people hit the first week they write a `Stop` or `PostToolUse` hook!
 
 **Trap 1: The Eternal `Stop` Loop**
-Suppose you write a `Stop` hook that runs `pytest` and exits `2` whenever tests fail, forcing the agent to keep trying. What if a test is flaky, or depends on a database that isn't running? The agent tries to fix it, stops, the hook blocks it, the agent tries again, stops, the hook blocks it—burning \$20 of API tokens in an infinite loop!
+Suppose you write a `Stop` hook that runs `pytest` and exits `2` whenever tests fail, forcing the agent to keep trying. What if a test is flaky, or depends on a database that isn't running? The agent tries to fix it, stops, the hook blocks it, the agent tries again, stops, the hook blocks it: burning \$20 of API tokens in an infinite loop!
 
 **The fix (two layers):**
 1. **Re-entrancy flag (`stop_hook_active`):** The harness sets `"stop_hook_active": true` in the `Stop` hook's JSON payload whenever the current turn was *already* triggered by a previous `Stop` hook block. Your hook script checks this flag (or tracks a retry counter) so it can bail out cleanly instead of looping forever.
@@ -295,7 +295,7 @@ Suppose a `PostToolUse` hook formats `app.ts`, and you also have a file-watcher 
 
 Real-world coding harnesses in 2025–2026 share the same core concepts while optimizing for their own ecosystems:
 
-- **Claude Code:** Uses a rich declarative hook system configured in `settings.json` (and plugin `hooks/hooks.json`) supporting `SessionStart`, `PreToolUse`, `PostToolUse`, `Stop`, `Notification`, `PermissionRequest`, and more. Supports multiple handler types—`command` (JSON `stdin`/`stdout` + exit code `2` blocking), `http` webhooks, `prompt`, and `agent` hooks—along with `hookSpecificOutput` (`permissionDecision`, `updatedInput`, `additionalContext`) and `stop_hook_active` for safe completion gates. Crucially, Claude Code **snapshots hooks at session startup** so live edits during a session cannot silently hijack execution.
+- **Claude Code:** Uses a rich declarative hook system configured in `settings.json` (and plugin `hooks/hooks.json`) supporting `SessionStart`, `PreToolUse`, `PostToolUse`, `Stop`, `Notification`, `PermissionRequest`, and more. Supports multiple handler types (`command` (JSON `stdin`/`stdout` + exit code `2` blocking), `http` webhooks, `prompt`, and `agent` hooks) along with `hookSpecificOutput` (`permissionDecision`, `updatedInput`, `additionalContext`) and `stop_hook_active` for safe completion gates. Crucially, Claude Code **snapshots hooks at session startup** so live edits during a session cannot silently hijack execution.
 - **Gemini CLI:** Ships a deeply granular event-driven hook architecture with JSON-over-`stdin` contracts and flexible matchers covering `SessionStart`/`SessionEnd`, `BeforeAgent`/`AfterAgent`, **`BeforeModel`/`AfterModel`**, `BeforeToolSelection`, and **`BeforeTool`/`AfterTool`**. Exposing `BeforeModel` and `AfterModel` makes it straightforward to build dynamic context injection, model routing, or real-time PII redaction right at the LLM boundary.
 - **OpenCode:** Takes an **in-process JavaScript/TypeScript plugin** approach. Plugins register typed lifecycle callbacks like `tool.execute.before`, `tool.execute.after`, and `experimental.chat.messages.transform`, giving ultra-low latency and direct programmatic access to messages and tool calls (including MCP tools) without spawning a shell subprocess on every event.
 - **OpenAI Codex CLI:** Discovers hooks via `.codex/hooks.json` and plugin bundles (`.codex-plugin/plugin.json`), paired with an explicit `/hooks` trust review workflow and enterprise lockdown knobs such as `allow_managed_hooks_only = true` so organizations can prevent arbitrary user or repo scripts from running.
@@ -309,7 +309,7 @@ Real-world coding harnesses in 2025–2026 share the same core concepts while op
    - *Fix:* Send **all** logs, diagnostics, and block messages to `stderr` (`sys.stderr`), and reserve `stdout` strictly for the single final JSON response object.
 
 2. **Running heavy commands on every `PostToolUse`:**
-   - *What breaks:* Running a full `tsc --noEmit` or `pytest` suite (15 seconds) after every single file edit turns a snappy 10-edit refactor into a painful 2.5-minute crawl—and runs the check on half-finished intermediate edits!
+   - *What breaks:* Running a full `tsc --noEmit` or `pytest` suite (15 seconds) after every single file edit turns a snappy 10-edit refactor into a painful 2.5-minute crawl, and runs the check on half-finished intermediate edits!
    - *Fix:* Keep `PostToolUse` hooks fast and file-scoped (< 1–2 seconds, e.g., format/lint only the edited file). Put whole-repo builds and test suites in a `Stop` hook instead, so they run once after the agent finishes a full batch of edits.
 
 3. **Assuming exit code `0` auto-approves a `PreToolUse` call:**
@@ -539,12 +539,12 @@ Notice how clean the separation of concerns is: the harness knows **nothing** ab
 
 1. **Why do harnesses like Claude Code use exit code `2` (instead of exit code `1`) to mean "block this tool call"?**
    <details><summary>Show Answer</summary>
-   Exit code `1` (and other non-zero codes like `127`) usually indicate an accidental crash in the hook script itself—such as a syntax error, missing dependency, or failed network call. Reserving exit code `2` specifically for an intentional policy block lets the harness cleanly separate intentional guardrails (whose `stderr` should be sent directly to the LLM to self-correct) from broken scripts (which should be logged as warnings or handled according to the hook's fail-open/fail-closed policy).
+   Exit code `1` (and other non-zero codes like `127`) usually indicate an accidental crash in the hook script itself, such as a syntax error, missing dependency, or failed network call. Reserving exit code `2` specifically for an intentional policy block lets the harness cleanly separate intentional guardrails (whose `stderr` should be sent directly to the LLM to self-correct) from broken scripts (which should be logged as warnings or handled according to the hook's fail-open/fail-closed policy).
    </details>
 
 2. **Your `PreToolUse` hook exits with code `0` and prints nothing to `stdout`. Does that automatically skip the user's permission prompt for a risky `Bash` command?**
    <details><summary>Show Answer</summary>
-   No! Exit code `0` with empty `stdout` means "this hook has no objection; fall through to the harness's normal permission policy." To explicitly auto-approve a tool call, the hook must output structured JSON specifying `"permissionDecision": "allow"`—and even then, any higher-priority `deny` rule still wins.
+   No! Exit code `0` with empty `stdout` means "this hook has no objection; fall through to the harness's normal permission policy." To explicitly auto-approve a tool call, the hook must output structured JSON specifying `"permissionDecision": "allow"`, and even then, any higher-priority `deny` rule still wins.
    </details>
 
 3. **Why should a harness snapshot hook configurations at session startup instead of hot-reloading `.claude/settings.json` on every turn?**

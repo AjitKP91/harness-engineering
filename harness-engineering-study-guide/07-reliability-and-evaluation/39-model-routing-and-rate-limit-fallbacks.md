@@ -11,7 +11,7 @@ Now imagine your coding agent grows up. Instead of one user running one session 
 2. **A single regional hiccup (`429` or `529`) freezes every user**, even when another cloud region or backup model is sitting wide open.
 3. **Naively switching models mid-session crashes with `400 Bad Request`** or silently destroys your prompt cache, multiplying your bill overnight.
 
-This chapter teaches you how to build a production-grade **model routing and failover layer**—normalizing vendor APIs behind one clean interface, matching tasks to the right model tier, proactively respecting multi-dimensional rate limits, preserving prompt-cache locality, and safely handling cross-model handoffs without breaking thinking blocks or tool calls.
+This chapter teaches you how to build a production-grade **model routing and failover layer**: normalizing vendor APIs behind one clean interface, matching tasks to the right model tier, proactively respecting multi-dimensional rate limits, preserving prompt-cache locality, and safely handling cross-model handoffs without breaking thinking blocks or tool calls.
 
 ---
 
@@ -19,14 +19,14 @@ This chapter teaches you how to build a production-grade **model routing and fai
 
 Imagine running a busy, high-end restaurant kitchen. Three everyday operational decisions keep dinner service smooth:
 
-1. **Standard kitchen bins at the receiving dock (Provider Abstraction):** One supplier delivers tomatoes in wooden crates, another in vacuum bags, and a third in cardboard boxes. Your line cooks shouldn't care who packed them—the receiving dock unpacks every delivery into the exact same labeled stainless-steel bins before it enters the kitchen.
+1. **Standard kitchen bins at the receiving dock (Provider Abstraction):** One supplier delivers tomatoes in wooden crates, another in vacuum bags, and a third in cardboard boxes. Your line cooks shouldn't care who packed them: the receiving dock unpacks every delivery into the exact same labeled stainless-steel bins before it enters the kitchen.
 2. **Right cook for the right job (Tiered Routing):** You do **not** pay your Michelin-star head chef \$120/hour to peel potatoes or wipe menus. Prep cooks handle fast, repetitive work; the head chef focuses exclusively on complex sauces and delicate plating.
-3. **Backup suppliers without abandoning a hot stove (Fallbacks & Cache Locality):** If Farm A's delivery truck gets stuck in traffic, you switch smoothly to Farm B so dinner service never stops. Crucially, you keep cooking at the *same hot stove* instead of moving your half-cooked stew to a cold kitchen on every single stir—and once you do move to a backup station, you stay there until the dish is done so you don't reheat two ovens!
+3. **Backup suppliers without abandoning a hot stove (Fallbacks & Cache Locality):** If Farm A's delivery truck gets stuck in traffic, you switch smoothly to Farm B so dinner service never stops. Crucially, you keep cooking at the *same hot stove* instead of moving your half-cooked stew to a cold kitchen on every single stir, and once you do move to a backup station, you stay there until the dish is done so you don't reheat two ovens!
 
 **Model routing and failover** applies those exact three instincts to LLM APIs:
 - **Normalize** every provider's quirks into one canonical internal format.
 - **Route** cheap/fast sub-tasks to lightweight models and hard reasoning to frontier models.
-- **Fail over** gracefully across regions, accounts, or models when rate limits or outages hit—while protecting your warm prompt caches and stripping vendor-specific state that other models cannot read.
+- **Fail over** gracefully across regions, accounts, or models when rate limits or outages hit, while protecting your warm prompt caches and stripping vendor-specific state that other models cannot read.
 
 ### What breaks if you don't build this layer?
 - **Brittle vendor lock-in:** Your core agent loop gets tangled in `if provider == "anthropic": ... elif provider == "openai": ...` conditionals that break whenever a vendor updates its SDK.
@@ -92,7 +92,7 @@ Here are the five concrete places where major providers diverge in 2025–2026:
 | **Overload / Limit Codes** | `429 rate_limit_error`, **`529 overloaded_error`**. | `429 rate_limit_exceeded` vs. `insufficient_quota`, `503`. | `429 RESOURCE_EXHAUSTED`, `503 UNAVAILABLE`. |
 
 #### Designing a Clean Canonical Representation
-Instead of storing raw vendor JSON inside your session transcript, store **canonical typed blocks**—while keeping a small, tagged `provider_meta` escape hatch for vendor-specific opaque fields (like thinking signatures):
+Instead of storing raw vendor JSON inside your session transcript, store **canonical typed blocks**: while keeping a small, tagged `provider_meta` escape hatch for vendor-specific opaque fields (like thinking signatures):
 
 ```typescript
 // Canonical internal types shared by the entire harness
@@ -149,7 +149,7 @@ If you use a frontier reasoning model for every single call in your harness, you
 
 #### Two Ways to Route: Static Role Routing vs. Cascading Escalation
 1. **Static Role Routing (Recommended Default):** The harness itself already knows *why* it is making an LLM call! Summarizing an older transcript during compaction (Chapter 10) or naming a session is explicitly tagged `tier="fast"`. Planning a complex refactor (Chapter 30) is tagged `tier="frontier"`. Zero extra latency, 100% predictable, and trivially configurable by the user.
-2. **Dynamic Cascading (Cheap-First, Escalate-on-Failure):** For high-volume automated pipelines (like CI code-review bots or bulk test-fixing workflows), you can try a Tier 2 workhorse model first. If deterministic verification (tests/type-check) fails after $N$ attempts—or if the harness detects a doom loop—automatically escalate the task to Tier 3 with a clean summary of what already failed.
+2. **Dynamic Cascading (Cheap-First, Escalate-on-Failure):** For high-volume automated pipelines (like CI code-review bots or bulk test-fixing workflows), you can try a Tier 2 workhorse model first. If deterministic verification (tests/type-check) fails after $N$ attempts, or if the harness detects a doom loop, automatically escalate the task to Tier 3 with a clean summary of what already failed.
 
 > **Important cache nuance:** Never alternate between Tier 1 and Tier 3 *inside the same growing conversation array*. Each model has its own completely separate prompt cache! Keep Tier 1 calls in **isolated side-calls or subagents** (Chapter 26) so the main conversation's warm Tier 2/3 prefix cache remains 100% intact.
 
@@ -183,10 +183,10 @@ Three mechanics work together to make failover fast, calm, and inexpensive:
 #### 1. Multi-Dimensional Token-Bucket Rate Limiters (RPM + ITPM + OTPM)
 Every LLM deployment enforces **three separate speed limits at the same time**:
 - **RPM (Requests Per Minute):** Total HTTP calls allowed per 60 seconds.
-- **ITPM (Input Tokens Per Minute):** Total prompt tokens ingested per 60 seconds. *(Note: On Anthropic, cached read tokens often do not count—or count at a reduced rate—against ITPM depending on tier, whereas uncached input tokens count in full!)*
+- **ITPM (Input Tokens Per Minute):** Total prompt tokens ingested per 60 seconds. *(Note: On Anthropic, cached read tokens often do not count, or count at a reduced rate, against ITPM depending on tier, whereas uncached input tokens count in full!)*
 - **OTPM (Output Tokens Per Minute):** Total generated tokens (including thinking tokens!) per 60 seconds.
 
-In coding agents, **ITPM is almost always the first wall you hit**. A single 120,000-token context window sent 4 times in one minute consumes 480,000 ITPM—even though RPM is a tiny 4!
+In coding agents, **ITPM is almost always the first wall you hit**. A single 120,000-token context window sent 4 times in one minute consumes 480,000 ITPM, even though RPM is a tiny 4!
 
 A **Token Bucket** models each limit cleanly: imagine a bucket holding up to $B$ tokens that continuously refills at $r = \text{limit} / 60$ tokens per second. Before sending a request:
 1. Estimate input tokens (Chapter 09) and reserve a conservative output budget (e.g., `max_tokens` or rolling p90 output size).
@@ -199,17 +199,17 @@ For multi-user servers or centralized gateways (like LiteLLM Proxy), these bucke
 #### 2. Ordered Fallback Chains (Minimize Blast Radius First)
 Do **not** jump straight from Claude Opus to a completely different vendor's tiny model at the first hiccup. Order your fallback chain from **smallest behavioral shift** to **largest**:
 
-1. **Hop 0 — Same Deployment (Brief Retry):** If `429` has `Retry-After <= 5s`, wait once so you keep your warm KV cache and zero behavioral change.
-2. **Hop 1 — Same Model Weights, Alternate Host/Region:** e.g., Anthropic Direct $\rightarrow$ Google Vertex AI (`us-east5`) $\rightarrow$ AWS Bedrock (`us-west-2`). Exact same model weights, exact same tool behavior, exact same prompt formatting.
-3. **Hop 2 — Same Vendor Family, Sibling Model:** e.g., Frontier model $\rightarrow$ Workhorse model from the same family. Keeps tool schemas, prompt style, and safety conventions identical.
-4. **Hop 3 — Cross-Vendor Frontier Fallback:** e.g., Anthropic $\rightarrow$ OpenAI or Gemini. Last line of defense during a total single-vendor outage; requires full message & thinking-block sanitization (Section 4.5).
+1. **Hop 0: Same Deployment (Brief Retry):** If `429` has `Retry-After <= 5s`, wait once so you keep your warm KV cache and zero behavioral change.
+2. **Hop 1: Same Model Weights, Alternate Host/Region:** e.g., Anthropic Direct $\rightarrow$ Google Vertex AI (`us-east5`) $\rightarrow$ AWS Bedrock (`us-west-2`). Exact same model weights, exact same tool behavior, exact same prompt formatting.
+3. **Hop 2: Same Vendor Family, Sibling Model:** e.g., Frontier model $\rightarrow$ Workhorse model from the same family. Keeps tool schemas, prompt style, and safety conventions identical.
+4. **Hop 3: Cross-Vendor Frontier Fallback:** e.g., Anthropic $\rightarrow$ OpenAI or Gemini. Last line of defense during a total single-vendor outage; requires full message & thinking-block sanitization (Section 4.5).
 
 #### 3. Preserving Prompt Cache Locality During Routing & Failover
 Remember from Chapter 08: prompt caches live physically in the GPU memory (KV cache) of the **specific provider, account, and region** that served Turn 1. AWS Bedrock in `us-east-1` does **not** share a prompt cache with AWS Bedrock in `us-west-2`, and neither shares a cache with Anthropic's direct API.
 
 Two routing rules save you tens of thousands of dollars at scale:
-- **Rule 1 — Sticky Session Affinity (Never Round-Robin Conversations):** Hash `session_id` (or pin the chosen `deployment_id` in session state) so Turn 1 through Turn 40 of a conversation always hit the **exact same deployment**. On OpenAI, also pass a stable `prompt_cache_key` (e.g., hash of workspace + session ID) so OpenAI's own load balancers route sequential turns to the same warm cache partition.
-- **Rule 2 — Sticky Failover (Hysteresis — Don't Flap!):** Suppose Session #42 is pinned to Region A, and on Turn 18 Region A throws `529 Overloaded`. You fail over to Region B and pay a one-time cache-write penalty to warm the 100k-token prefix in Region B. **Update Session #42's sticky pin to Region B!** If you blindly revert to Region A on Turn 19 just because Region A recovered, you throw away Region B's fresh cache and pay a *second* cache-write penalty on Region A (whose 5-minute TTL may already have expired). Only move again if Region B itself fails.
+- **Rule 1: Sticky Session Affinity (Never Round-Robin Conversations):** Hash `session_id` (or pin the chosen `deployment_id` in session state) so Turn 1 through Turn 40 of a conversation always hit the **exact same deployment**. On OpenAI, also pass a stable `prompt_cache_key` (e.g., hash of workspace + session ID) so OpenAI's own load balancers route sequential turns to the same warm cache partition.
+- **Rule 2 (Sticky Failover (Hysteresis) Don't Flap!):** Suppose Session #42 is pinned to Region A, and on Turn 18 Region A throws `529 Overloaded`. You fail over to Region B and pay a one-time cache-write penalty to warm the 100k-token prefix in Region B. **Update Session #42's sticky pin to Region B!** If you blindly revert to Region A on Turn 19 just because Region A recovered, you throw away Region B's fresh cache and pay a *second* cache-write penalty on Region A (whose 5-minute TTL may already have expired). Only move again if Region B itself fails.
 
 ---
 
@@ -223,7 +223,7 @@ Modern reasoning models (Claude with extended thinking, Gemini 2.5/3 thinking mo
 - **Google Gemini API:** Attaches an encrypted `thought_signature` directly to response parts (especially parallel `functionCall` parts). Omitting or altering it on replay to Gemini causes validation failures or severe reasoning degradation.
 - **OpenAI Responses API:** Emits opaque/encrypted reasoning items bound to OpenAI's server-side validation keys.
 
-**What happens during a cross-model handoff?** A signature signed by Anthropic's private key is complete gibberish to Gemini or OpenAI (and even between incompatible model generations within the same vendor!). Passing it raw causes an instant `400 Bad Request`—turning your "high-availability fallback" into a hard crash!
+**What happens during a cross-model handoff?** A signature signed by Anthropic's private key is complete gibberish to Gemini or OpenAI (and even between incompatible model generations within the same vendor!). Passing it raw causes an instant `400 Bad Request`, turning your "high-availability fallback" into a hard crash!
 
 **The Fix: The "Strip & Re-Anchor" Pattern**
 Your provider adapter must check `originProvider` and `originModel` on every historical `thinking` block before serializing a request:
@@ -247,9 +247,9 @@ If your cross-vendor fallback swaps models mid-session, ensure your **tool schem
 
 - **LiteLLM Proxy & Router:** The most widely adopted open-source LLM gateway. LiteLLM normalizes 100+ providers into one OpenAI/Anthropic-compatible API, tracks per-deployment `rpm`, `tpm`, `itpm`, and `otpm` in memory or Redis, puts failing deployments into configurable cooldown windows on `429`/`529`/`503`, supports explicit `fallbacks` and `context_window_fallbacks` (automatically routing oversized prompts to a 1M-token model), translates Anthropic `cache_control` blocks across Bedrock and Vertex AI, and supports **cache-aware session affinity** so multi-turn conversations stay pinned to warm deployments.
 - **OpenRouter:** Acts as a managed multi-provider router with built-in provider ordering (`provider.order`), automatic fallback across multiple cloud hosts serving the same weights (e.g., Anthropic Direct, Bedrock, Vertex), sticky prompt-cache routing, and structured `error.metadata.limit_source` telemetry so clients know whether a `429` came from their own key or a shared upstream pool.
-- **Vercel AI SDK:** Provides a clean TypeScript provider abstraction (`LanguageModelV2`) and composable middleware (`wrapLanguageModel`) so harnesses like **OpenCode** can swap between Anthropic, OpenAI, Google, Bedrock, and local models without rewriting the agent loop—handling reasoning-part normalization and mid-session model switching inside provider adapters.
-- **Claude Code:** Uses **tiered internal routing**—delegating lightweight tasks (like session summarization, command classification, and fast read-only `Explore` subagents) to fast Haiku-class models while keeping the primary editing loop on Sonnet/Opus. It also abstracts the backend transport so enterprise teams can point the exact same harness at the Anthropic API, AWS Bedrock, Google Vertex AI, or Microsoft Foundry.
-- **Aider (`architect` / `editor` mode):** Pioneered explicit two-model task tiering for coding harnesses: a strong reasoning model (`architect`) analyzes the codebase and writes a natural-language change plan, while a faster, cheaper model (`editor`) translates that plan into exact file search-and-replace diffs—combining frontier reasoning with fast, inexpensive code editing.
+- **Vercel AI SDK:** Provides a clean TypeScript provider abstraction (`LanguageModelV2`) and composable middleware (`wrapLanguageModel`) so harnesses like **OpenCode** can swap between Anthropic, OpenAI, Google, Bedrock, and local models without rewriting the agent loop; handling reasoning-part normalization and mid-session model switching inside provider adapters.
+- **Claude Code:** Uses **tiered internal routing**: delegating lightweight tasks (like session summarization, command classification, and fast read-only `Explore` subagents) to fast Haiku-class models while keeping the primary editing loop on Sonnet/Opus. It also abstracts the backend transport so enterprise teams can point the exact same harness at the Anthropic API, AWS Bedrock, Google Vertex AI, or Microsoft Foundry.
+- **Aider (`architect` / `editor` mode):** Pioneered explicit two-model task tiering for coding harnesses: a strong reasoning model (`architect`) analyzes the codebase and writes a natural-language change plan, while a faster, cheaper model (`editor`) translates that plan into exact file search-and-replace diffs; combining frontier reasoning with fast, inexpensive code editing.
 
 ---
 
@@ -257,7 +257,7 @@ If your cross-vendor fallback swaps models mid-session, ensure your **tool schem
 
 1. **Naive Round-Robin Load Balancing Destroys Your Cache:** Splitting Turns 1, 2, 3, and 4 across Regions A, B, A, B drops your prompt-cache hit rate near zero, inflating both TTFT latency and input spend by up to 5×–10×. *Fix:* Pin each `session_id` to one deployment using sticky affinity.
 2. **Failover Flapping (Double Cache-Write Tax):** Failing over from Region A to Region B on Turn 15, warming Region B's cache, and then immediately bouncing back to Region A on Turn 16 forces you to pay cache-write overhead twice. *Fix:* Update the session's sticky deployment pointer whenever failover succeeds.
-3. **Passing Raw Thinking Signatures Across Models:** Forwarding Anthropic `thinking` blocks or Gemini `thought_signature` payloads to a fallback vendor triggers instant `400 Bad Request` loops—making your failover path completely unusable during real outages. *Fix:* Tag every thinking block with `originProvider` + `originModel` and strip foreign blocks during cross-model translation.
+3. **Passing Raw Thinking Signatures Across Models:** Forwarding Anthropic `thinking` blocks or Gemini `thought_signature` payloads to a fallback vendor triggers instant `400 Bad Request` loops, making your failover path completely unusable during real outages. *Fix:* Tag every thinking block with `originProvider` + `originModel` and strip foreign blocks during cross-model translation.
 4. **Retrying Exhausted Quotas Like Burst Limits:** Treating `429 insufficient_quota` identically to `429 rate_limit_exceeded` wastes 30–60 seconds of exponential backoff on a dead billing key. *Fix:* Classify `quota_exhausted` separately in your adapter and immediately trip a long cooldown to fail over.
 5. **Tracking Only RPM While Getting Crushed by ITPM:** Coding agents send massive contexts at low request frequency. A rate limiter that only checks `rpm < 50` will still slam into `429` on Turn 3 when 4 parallel subagents push 400,000 input tokens in 10 seconds. *Fix:* Enforce simultaneous `rpm`, `itpm`, and `otpm` token buckets and reconcile against live provider headers.
 6. **Silent Downgrade to a Weak Model on High-Risk Tasks:** Quietly falling back from a frontier model to a tiny fast model mid-database-migration can cause subtle, dangerous code bugs while the user assumes the frontier model is still driving. *Fix:* Restrict automatic fallbacks to **capability-equivalent peers**, log every fallback visibly in the UI/telemetry (Chapter 38), and escalate to the human rather than silently downgrading below your safety floor.
@@ -441,7 +441,7 @@ class StickyFallbackRouter:
 
 - **Normalize at the edge:** Keep your core agent loop vendor-agnostic using canonical messages, canonical tool schemas, and canonical error classes (`rate_limit_burst`, `quota_exhausted`, `overloaded`, `invalid_request`).
 - **Match model tier to cognitive load:** Keep lightweight helper tasks (summarization, titles, read-only search subagents) on fast, cheap models in isolated contexts while reserving frontier models for hard reasoning.
-- **Rate-limit all three dimensions:** Coding agents hit **ITPM** (input tokens per minute) far sooner than RPM—track RPM, ITPM, and OTPM locally and read live provider rate-limit headers.
+- **Rate-limit all three dimensions:** Coding agents hit **ITPM** (input tokens per minute) far sooner than RPM; track RPM, ITPM, and OTPM locally and read live provider rate-limit headers.
 - **Protect prompt-cache locality:** Never round-robin stateful agent turns across regions. Pin each `session_id` to one warm deployment, and update that pin on failover (hysteresis) so you never flap and pay double cache-write penalties.
 - **Sanitize thinking blocks on cross-model handoff:** Keep cryptographic thinking signatures untouched when replaying to the *same* model, but **strip** them cleanly whenever crossing provider or model boundaries to avoid instant `400` errors.
 
@@ -462,7 +462,7 @@ class StickyFallbackRouter:
 3. **How should your router react differently to a `429` caused by `rate_limit_exceeded` (with `Retry-After: 2`) versus a `429` caused by `insufficient_quota`?**
    <details>
    <summary>Show Answer</summary>
-   A `rate_limit_exceeded` error with a 2-second `Retry-After` is a temporary per-minute burst limit—sleeping 2 seconds and retrying on the same warm deployment preserves your prompt cache and succeeds immediately. An `insufficient_quota` error means the account is out of credits or hit a billing cap—retrying it will fail every time, so you must immediately mark that deployment disabled (long cooldown) and fail over to a backup account/provider or alert the user.
+   A `rate_limit_exceeded` error with a 2-second `Retry-After` is a temporary per-minute burst limit: sleeping 2 seconds and retrying on the same warm deployment preserves your prompt cache and succeeds immediately. An `insufficient_quota` error means the account is out of credits or hit a billing cap: retrying it will fail every time, so you must immediately mark that deployment disabled (long cooldown) and fail over to a backup account/provider or alert the user.
    </details>
 
 4. **Why should a coding agent's local rate limiter track ITPM and OTPM in addition to RPM?**
