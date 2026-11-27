@@ -22,81 +22,181 @@ export function mountLab(container: HTMLElement, lab: LabDefinition): () => void
 /* ==========================================================================
    Lab 1: Live Tool-Use Loop Simulator (Chapter 01)
    ========================================================================== */
+interface LoopMessageCard {
+  role: 'user' | 'assistant' | 'tool';
+  label: string;
+  summary: string;
+  raw: Record<string, unknown>;
+}
+
+interface LoopTurnStep {
+  turnNum: number;
+  title: string;
+  sentCount: number;
+  stopReason: 'tool_use' | 'end_turn';
+  verdictTitle: string;
+  verdictDetail: string;
+  harnessNext: string;
+  newMessagesCount: number;
+  historyAfterReply: LoopMessageCard[];
+}
+
 function mountToolLoopLab(container: HTMLElement, lab: LabDefinition): () => void {
-  const turns = [
-    {
-      title: 'Turn 1: User sends bug report (Cold cache write)',
-      stopReason: 'tool_use',
-      action: 'LLM asks to read tests/test_auth.py',
-      tokens: 1850,
-      cachedTokens: 0,
-      messages: [
-        { role: 'user', content: 'Fix the failing login test in tests/test_auth.py' },
+  const m1: LoopMessageCard = {
+    role: 'user',
+    label: 'User Prompt',
+    summary: '"Fix the failing login test in tests/test_auth.py"',
+    raw: { role: 'user', content: 'Fix the failing login test in tests/test_auth.py' },
+  };
+  const m2: LoopMessageCard = {
+    role: 'assistant',
+    label: 'LLM Reply (tool_use)',
+    summary: 'Asks harness to run read_file("tests/test_auth.py")',
+    raw: {
+      role: 'assistant',
+      content: [{ type: 'tool_use', id: 'call_01', name: 'read_file', input: { path: 'tests/test_auth.py' } }],
+    },
+  };
+  const m3: LoopMessageCard = {
+    role: 'tool',
+    label: 'Harness Tool Result',
+    summary: 'Line 12 of tests/test_auth.py: assert res.status_code == 401',
+    raw: {
+      role: 'user',
+      content: [{ type: 'tool_result', tool_use_id: 'call_01', content: '12| assert res.status_code == 401' }],
+    },
+  };
+  const m4: LoopMessageCard = {
+    role: 'assistant',
+    label: 'LLM Reply (tool_use)',
+    summary: 'Asks harness to run read_file("src/auth.py")',
+    raw: {
+      role: 'assistant',
+      content: [{ type: 'tool_use', id: 'call_02', name: 'read_file', input: { path: 'src/auth.py' } }],
+    },
+  };
+  const m5: LoopMessageCard = {
+    role: 'tool',
+    label: 'Harness Tool Result',
+    summary: 'Line 40 of src/auth.py: if token: return 200 (missing expiry check!)',
+    raw: {
+      role: 'user',
+      content: [{ type: 'tool_result', tool_use_id: 'call_02', content: '40| if token:\n41|     return 200' }],
+    },
+  };
+  const m6: LoopMessageCard = {
+    role: 'assistant',
+    label: 'LLM Reply (tool_use)',
+    summary: 'Asks harness to edit src/auth.py to add not is_expired(token)',
+    raw: {
+      role: 'assistant',
+      content: [
         {
-          role: 'assistant',
-          content: [{ type: 'tool_use', id: 'toolu_01', name: 'read_file', input: { path: 'tests/test_auth.py' } }],
+          type: 'tool_use',
+          id: 'call_03',
+          name: 'edit_file',
+          input: { path: 'src/auth.py', old: 'if token:', new: 'if token and not is_expired(token):' },
         },
       ],
     },
+  };
+  const m7: LoopMessageCard = {
+    role: 'tool',
+    label: 'Harness Tool Result',
+    summary: 'Patched src/auth.py successfully (1 line updated)',
+    raw: {
+      role: 'user',
+      content: [{ type: 'tool_result', tool_use_id: 'call_03', content: 'Patched src/auth.py (1 line updated)' }],
+    },
+  };
+  const m8: LoopMessageCard = {
+    role: 'assistant',
+    label: 'LLM Reply (tool_use)',
+    summary: 'Asks harness to run run_shell("pytest tests/test_auth.py")',
+    raw: {
+      role: 'assistant',
+      content: [{ type: 'tool_use', id: 'call_04', name: 'run_shell', input: { command: 'pytest tests/test_auth.py' } }],
+    },
+  };
+  const m9: LoopMessageCard = {
+    role: 'tool',
+    label: 'Harness Tool Result',
+    summary: 'Exit code 0: 1 passed in 0.14s',
+    raw: {
+      role: 'user',
+      content: [{ type: 'tool_result', tool_use_id: 'call_04', content: '1 passed in 0.14s' }],
+    },
+  };
+  const m10: LoopMessageCard = {
+    role: 'assistant',
+    label: 'LLM Final Reply (text)',
+    summary: '"Fixed the missing expiry check in src/auth.py and verified pytest passes."',
+    raw: {
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Fixed the missing expiry check in src/auth.py and verified pytest passes.' }],
+    },
+  };
+
+  const turns: LoopTurnStep[] = [
     {
-      title: 'Turn 2: Harness executes read_file & returns result',
+      turnNum: 1,
+      title: 'Turn 1: Inspect the failing test',
+      sentCount: 1,
       stopReason: 'tool_use',
-      action: 'LLM sees assertion & runs pytest to confirm failure',
-      tokens: 3100,
-      cachedTokens: 1850,
-      messages: [
-        { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_01', content: '12| assert res.status_code == 401' }] },
-        {
-          role: 'assistant',
-          content: [{ type: 'tool_use', id: 'toolu_02', name: 'run_shell', input: { command: 'pytest tests/test_auth.py' } }],
-        },
-      ],
+      verdictTitle: 'Keep looping (stop_reason == "tool_use")',
+      verdictDetail: 'The model cannot read files itself, so it pauses and asks the harness to open tests/test_auth.py.',
+      harnessNext: 'Harness executes read_file locally, appends the tool_result as message #3, and loops back to the LLM.',
+      newMessagesCount: 2,
+      historyAfterReply: [m1, m2],
     },
     {
-      title: 'Turn 3: Test fails (200 instead of 401); LLM reads src/auth.py',
+      turnNum: 2,
+      title: 'Turn 2: Read the auth implementation',
+      sentCount: 3,
       stopReason: 'tool_use',
-      action: 'LLM locates missing expiry check & calls edit_file',
-      tokens: 4650,
-      cachedTokens: 3050,
-      messages: [
-        { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_02', content: 'FAILED: expected 401, got 200' }] },
-        {
-          role: 'assistant',
-          content: [{ type: 'tool_use', id: 'toolu_03', name: 'edit_file', input: { path: 'src/auth.py', old: 'if token:', new: 'if token and not is_expired(token):' } }],
-        },
-      ],
+      verdictTitle: 'Keep looping (stop_reason == "tool_use")',
+      verdictDetail: 'Because the API is stateless, the harness resends all 3 messages so the LLM remembers the goal and test output.',
+      harnessNext: 'Harness runs read_file("src/auth.py"), appends the code snippet as message #5, and calls the LLM again.',
+      newMessagesCount: 2,
+      historyAfterReply: [m1, m2, m3, m4],
     },
     {
-      title: 'Turn 4: Patch applied atomically; LLM re-runs pytest',
+      turnNum: 3,
+      title: 'Turn 3: Apply the surgical fix',
+      sentCount: 5,
       stopReason: 'tool_use',
-      action: 'Harness verifies exit_code=0 (all tests pass!)',
-      tokens: 5400,
-      cachedTokens: 4600,
-      messages: [
-        { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_03', content: 'Patched src/auth.py (1 line changed)' }] },
-        {
-          role: 'assistant',
-          content: [{ type: 'tool_use', id: 'toolu_04', name: 'run_shell', input: { command: 'pytest tests/test_auth.py' } }],
-        },
-      ],
+      verdictTitle: 'Keep looping (stop_reason == "tool_use")',
+      verdictDetail: 'With all 5 messages resent, the model spots the missing expiry check in src/auth.py and requests an edit.',
+      harnessNext: 'Harness writes the 1-line patch to disk, appends confirmation as message #7, and continues the loop.',
+      newMessagesCount: 2,
+      historyAfterReply: [m1, m2, m3, m4, m5, m6],
     },
     {
-      title: 'Turn 5: Loop exits cleanly on stop_reason = "end_turn"',
+      turnNum: 4,
+      title: 'Turn 4: Verify with pytest',
+      sentCount: 7,
+      stopReason: 'tool_use',
+      verdictTitle: 'Keep looping (stop_reason == "tool_use")',
+      verdictDetail: 'Good harnesses let the model verify its own edits instead of guessing. The model requests pytest on turn 4.',
+      harnessNext: 'Harness runs pytest tests/test_auth.py, appends "1 passed in 0.14s" as message #9, and calls the LLM one last time.',
+      newMessagesCount: 2,
+      historyAfterReply: [m1, m2, m3, m4, m5, m6, m7, m8],
+    },
+    {
+      turnNum: 5,
+      title: 'Turn 5: Exit cleanly and answer the user',
+      sentCount: 9,
       stopReason: 'end_turn',
-      action: 'Harness delivers summary to user and stops calling API',
-      tokens: 5900,
-      cachedTokens: 5350,
-      messages: [
-        { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_04', content: '1 passed in 0.14s' }] },
-        {
-          role: 'assistant',
-          content: [{ type: 'text', text: 'Fixed the expired-token check in src/auth.py and verified pytest passes.' }],
-        },
-      ],
+      verdictTitle: 'Exit while loop (stop_reason == "end_turn")',
+      verdictDetail: 'Seeing all 9 messages (including green tests), the LLM returns plain text with no tool calls.',
+      harnessNext: 'Harness breaks out of the while loop, prints the final summary to the user, and stops calling the API.',
+      newMessagesCount: 2,
+      historyAfterReply: [m1, m2, m3, m4, m5, m6, m7, m8, m9, m10],
     },
   ];
 
   let step = 0;
+  let showJson = false;
   let playing = false;
   let timer: number | undefined;
 
@@ -106,9 +206,12 @@ function mountToolLoopLab(container: HTMLElement, lab: LabDefinition): () => voi
         <div>
           <span class="badge badge-teal">Interactive Lab · ${lab.badge}</span>
           <h3 class="lab-title">${lab.title}</h3>
+          <p class="lab-intro">Step through how the harness resends a growing message log on every turn until <code>stop_reason</code> becomes <code>"end_turn"</code>.</p>
         </div>
         <div class="lab-controls">
-          <button type="button" class="btn-ghost btn-sm" data-act="step">Step →</button>
+          <button type="button" class="btn-ghost btn-sm" data-act="prev">← Back</button>
+          <span class="tl-step-counter" id="tl-counter">Turn 1 / 5</span>
+          <button type="button" class="btn-ghost btn-sm" data-act="step">Next →</button>
           <button type="button" class="btn-ghost btn-sm" data-act="play">Play</button>
           <button type="button" class="btn-ghost btn-sm" data-act="reset">Reset</button>
         </div>
@@ -116,11 +219,14 @@ function mountToolLoopLab(container: HTMLElement, lab: LabDefinition): () => voi
       <div id="tl-status" style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;"></div>
       <div class="lab-grid-2">
         <div class="lab-pane">
-          <div class="lab-pane-title">Conversation History Sent to API (Last 2 Messages)</div>
-          <pre class="lab-pre" id="tl-json"></pre>
+          <div class="tl-pane-head">
+            <div class="lab-pane-title" id="tl-left-title" style="margin:0;">Growing Message History</div>
+            <button type="button" class="btn-ghost btn-sm" data-act="toggle-json" id="tl-json-toggle">Show Raw API JSON</button>
+          </div>
+          <div id="tl-history-view"></div>
         </div>
         <div class="lab-pane">
-          <div class="lab-pane-title">Harness State & Token Economics</div>
+          <div class="lab-pane-title">While-Loop State &amp; Decision</div>
           <div id="tl-metrics"></div>
         </div>
       </div>
@@ -128,25 +234,78 @@ function mountToolLoopLab(container: HTMLElement, lab: LabDefinition): () => voi
   `;
 
   const statusEl = container.querySelector('#tl-status')!;
-  const jsonEl = container.querySelector('#tl-json')!;
+  const counterEl = container.querySelector('#tl-counter')!;
+  const leftTitleEl = container.querySelector('#tl-left-title')!;
+  const historyEl = container.querySelector('#tl-history-view')!;
   const metricsEl = container.querySelector('#tl-metrics')!;
+  const prevBtn = container.querySelector<HTMLButtonElement>('[data-act="prev"]')!;
+  const nextBtn = container.querySelector<HTMLButtonElement>('[data-act="step"]')!;
   const playBtn = container.querySelector<HTMLButtonElement>('[data-act="play"]')!;
+  const jsonToggleBtn = container.querySelector<HTMLButtonElement>('#tl-json-toggle')!;
 
   const render = () => {
     const t = turns[step];
-    const uncached = t.tokens - t.cachedTokens;
-    const totalHistoryMsgs = (step + 1) * 2;
+    const totalStored = t.historyAfterReply.length;
+    const newStartIdx = totalStored - t.newMessagesCount;
+
+    counterEl.textContent = `Turn ${t.turnNum} / ${turns.length}`;
+    prevBtn.disabled = step === 0;
+    nextBtn.disabled = step === turns.length - 1;
+    jsonToggleBtn.textContent = showJson ? 'Show Visual Stack' : 'Show Raw API JSON';
+    leftTitleEl.textContent = showJson
+      ? `Messages API Payload (${totalStored} messages in log)`
+      : `Growing Message Log (${t.sentCount} sent → ${totalStored} stored)`;
+
     statusEl.innerHTML = `
       <span class="badge badge-accent">${t.title}</span>
       <span class="badge ${t.stopReason === 'end_turn' ? 'badge-done' : 'badge-teal'}">stop_reason: "${t.stopReason}"</span>
     `;
-    jsonEl.textContent = JSON.stringify(t.messages, null, 2);
+
+    if (showJson) {
+      const payload = {
+        messages: t.historyAfterReply.map((m) => m.raw),
+      };
+      historyEl.innerHTML = `<pre class="lab-pre">${JSON.stringify(payload, null, 2).replace(/</g, '&lt;')}</pre>`;
+    } else {
+      historyEl.innerHTML = `<div class="tl-stack">${t.historyAfterReply
+        .map((m, idx) => {
+          const isNew = idx >= newStartIdx;
+          return `
+            <div class="tl-msg is-${m.role} ${isNew ? 'is-new' : ''}">
+              <div class="tl-msg-top">
+                <span class="tl-msg-role">#${idx + 1} · ${m.label}</span>
+                ${isNew ? '<span class="tl-new-badge">This turn</span>' : '<span class="tl-resent-badge">Resent</span>'}
+              </div>
+              <div class="tl-msg-body">${m.summary}</div>
+            </div>`;
+        })
+        .join('')}</div>`;
+    }
+
+    const isDone = t.stopReason === 'end_turn';
     metricsEl.innerHTML = `
-      <p style="margin:0 0 10px;font-size:13.5px;"><strong>Next Harness Action:</strong> ${t.action}</p>
-      <p style="margin:0 0 6px;font-size:13px;">History array length: <code>${totalHistoryMsgs} messages</code></p>
-      <p style="margin:0 0 6px;font-size:13px;">Total input tokens this turn: <code>${t.tokens.toLocaleString()}</code></p>
-      <p style="margin:0 0 6px;font-size:13px;">Cached prefix tokens (90% off): <code style="color:var(--success)">${t.cachedTokens.toLocaleString()}</code></p>
-      <p style="margin:0;font-size:13px;">Fresh uncached tokens: <code style="color:var(--accent)">${uncached.toLocaleString()}</code></p>
+      <div class="tl-verdict ${isDone ? 'is-done' : 'is-loop'}">
+        <strong>${t.verdictTitle}</strong>
+        <p>${t.verdictDetail}</p>
+      </div>
+      <div class="tl-relay">
+        <div class="tl-relay-step">
+          <span class="tl-relay-num">1</span>
+          <span>Harness sends all <strong>${t.sentCount} message${t.sentCount === 1 ? '' : 's'}</strong> to the stateless LLM</span>
+        </div>
+        <div class="tl-relay-step">
+          <span class="tl-relay-num">2</span>
+          <span>LLM returns <code>stop_reason = "${t.stopReason}"</code></span>
+        </div>
+        <div class="tl-relay-step">
+          <span class="tl-relay-num">3</span>
+          <span>${t.harnessNext}</span>
+        </div>
+      </div>
+      <div class="tl-meter">
+        <span>History array size: <strong>${totalStored} messages</strong></span>
+        <span>Turn budget: <strong>${t.turnNum} / 25 max</strong></span>
+      </div>
     `;
   };
 
@@ -157,9 +316,24 @@ function mountToolLoopLab(container: HTMLElement, lab: LabDefinition): () => voi
     playBtn.textContent = 'Play';
   };
 
-  container.querySelector('[data-act="step"]')!.addEventListener('click', () => {
+  prevBtn.addEventListener('click', () => {
     stop();
-    step = (step + 1) % turns.length;
+    if (step > 0) {
+      step -= 1;
+      render();
+    }
+  });
+
+  nextBtn.addEventListener('click', () => {
+    stop();
+    if (step < turns.length - 1) {
+      step += 1;
+      render();
+    }
+  });
+
+  jsonToggleBtn.addEventListener('click', () => {
+    showJson = !showJson;
     render();
   });
 
@@ -173,13 +347,17 @@ function mountToolLoopLab(container: HTMLElement, lab: LabDefinition): () => voi
     if (playing) {
       stop();
     } else {
+      if (step === turns.length - 1) step = 0;
       playing = true;
       playBtn.textContent = 'Pause';
+      render();
       timer = window.setInterval(() => {
-        step = (step + 1) % turns.length;
-        render();
+        if (step < turns.length - 1) {
+          step += 1;
+          render();
+        }
         if (step === turns.length - 1) stop();
-      }, 1800);
+      }, 2100);
     }
   });
 

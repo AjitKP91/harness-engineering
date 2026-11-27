@@ -1633,6 +1633,206 @@ details:not([open])::details-content {
   background: var(--danger-soft);
 }
 
+.inline-lab-mount {
+  margin: 18px 0 26px;
+}
+
+.prose .inline-lab-mount .lab-title {
+  margin: 6px 0 0;
+  font-size: 1.25rem;
+}
+
+.prose .inline-lab-mount .lab-intro {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  color: var(--ink-secondary);
+}
+
+.prose .inline-lab-mount .lab-card p {
+  margin: 0;
+}
+
+.lab-intro {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  color: var(--ink-secondary);
+}
+
+.tl-step-counter {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-secondary);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+}
+
+.tl-pane-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.tl-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 310px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.tl-msg {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  background: var(--bg-subtle);
+  opacity: 0.78;
+}
+
+.tl-msg.is-new {
+  opacity: 1;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
+
+.tl-msg.is-user {
+  border-left-color: var(--mod-0);
+}
+
+.tl-msg.is-assistant {
+  border-left-color: var(--accent);
+}
+
+.tl-msg.is-tool {
+  border-left-color: var(--teal);
+}
+
+.tl-msg-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.tl-msg-role {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.tl-new-badge,
+.tl-resent-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tl-new-badge {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.tl-resent-badge {
+  color: var(--ink-muted);
+  background: var(--bg-muted);
+}
+
+.tl-msg-body {
+  font-size: 12.5px;
+  color: var(--ink-secondary);
+  line-height: 1.4;
+}
+
+.tl-verdict {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.tl-verdict.is-loop {
+  background: var(--teal-soft);
+  border-color: color-mix(in srgb, var(--teal) 35%, transparent);
+}
+
+.tl-verdict.is-done {
+  background: var(--success-soft);
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+}
+
+.tl-verdict strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.tl-verdict p {
+  font-size: 12.5px;
+  color: var(--ink-secondary);
+  line-height: 1.45;
+}
+
+.tl-relay {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tl-relay-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-secondary);
+}
+
+.tl-relay-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-strong);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--ink);
+  margin-top: 1px;
+}
+
+.tl-meter {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+
+.lab-controls button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* ==========================================================================
    Chapter Footer Navigation
    ========================================================================== */

@@ -10,7 +10,7 @@ If you cannot rewind an agent cleanly, users become terrified to let it run auto
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 Think of playing a difficult video game right before a boss fight. Before you open the boss room door, you hit **Quick Save**.
 

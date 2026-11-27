@@ -12,15 +12,15 @@ This chapter teaches you how to measure, partition, and police your context wind
 
 ---
 
-## 1. The Simple Idea: A Chef's Prep Counter
+## 1. The Simple Idea: A Hardware Engineer's Workbench
 
-Picture a chef working at a kitchen prep counter that is **10 feet wide**.
+Picture an engineer debugging a circuit board on a physical workbench that is **10 feet wide**.
 
-- You would **never** cover all 10 feet of the counter with spice jars, dirty bowls, and unopened grocery bags. Why? Two reasons:
-  1. **You need empty workspace to cook.** If 100% of the counter is covered with ingredients, there is zero room left to set down a cutting board and plate the meal! (In an LLM, that empty space is **output & thinking headroom**.)
-  2. **Clutter causes mistakes.** Even when only 7 feet of the counter is piled with old pans from three dishes ago, the chef slows down, knocks things over, and accidentally grabs baking soda instead of flour. (In an LLM, that clutter-induced error rate is called **context rot**.)
+- You would **never** cover all 10 feet of the bench with binders, spare cables, and old printouts. Why? Two reasons:
+  1. **You need open workspace to build.** If 100% of the bench is covered with reference manuals, there is zero room left to lay down the active circuit board and solder a fix! (In an LLM, that empty space is **output & thinking headroom**.)
+  2. **Clutter causes mistakes.** Even when only 7 feet of the bench is piled with outdated schematics from three projects ago, the engineer slows down, grabs the wrong datasheet, and wires the wrong pin. (In an LLM, that clutter-induced error rate is called **context rot**.)
 
-**Context Window Budgeting** is the discipline of dividing that 10-foot counter into dedicated zones (permanent tools, active recipe, recent prep notes, and guaranteed empty cooking space) and clearing clutter *before* the counter overflows.
+**Context Window Budgeting** is the discipline of dividing that 10-foot workbench into dedicated zones (permanent tools, project guidelines, active debugging notes, and guaranteed empty workspace) and clearing clutter *before* the bench overflows.
 
 ### What Breaks Without It?
 

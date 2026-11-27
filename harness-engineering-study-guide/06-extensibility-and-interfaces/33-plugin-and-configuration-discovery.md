@@ -14,7 +14,7 @@ This chapter covers **layered configuration precedence**, **plugin packaging**, 
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 Imagine checking into a hotel room during a conference:
 

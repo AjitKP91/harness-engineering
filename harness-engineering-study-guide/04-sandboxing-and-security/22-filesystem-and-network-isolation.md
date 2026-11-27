@@ -10,7 +10,7 @@ This chapter covers the exact **filesystem** and **network** isolation rules tha
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 Think of a secure **cleanroom laboratory** where a chemist works on one specific sample:
 

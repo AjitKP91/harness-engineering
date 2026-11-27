@@ -12,7 +12,7 @@ An ad-hoc `while` loop wrapped in a pile of boolean flags (`isRunning`, `isWaiti
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 Think of an **automatic washing machine**.
 

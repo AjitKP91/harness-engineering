@@ -15,7 +15,7 @@ This chapter teaches you how to build a production-grade **model routing and fai
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 Imagine running a busy, high-end restaurant kitchen. Three everyday operational decisions keep dinner service smooth:
 

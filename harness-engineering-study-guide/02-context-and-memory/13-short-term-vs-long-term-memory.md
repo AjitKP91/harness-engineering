@@ -12,7 +12,7 @@ This chapter shows you how to design long-term memory for a real harness: separa
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 ### The Brilliant Plumber With Morning Amnesia
 
@@ -43,7 +43,7 @@ Real software engineering does not happen in one 10-minute chat. Developers work
 
 ---
 
-## 3. The Big Picture (Visual Diagram)
+## 3. The Big Picture
 
 A production memory system separates **short-term working memory** (what is inside the LLM's context window right now) from **long-term persistent memory** (what survives across sessions), with strict hygiene gates on both reads and writes:
 

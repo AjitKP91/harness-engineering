@@ -12,7 +12,7 @@ If compaction is the cleanup crew inside the room, **tool output truncation and 
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 Go back to our **Remote Specialist on a Phone Call** from Chapter 00.
 

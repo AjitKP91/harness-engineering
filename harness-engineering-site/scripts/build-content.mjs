@@ -121,7 +121,7 @@ const READING_PATHS = [
     id: 'weekend-builder',
     title: 'Weekend Builder',
     goal: 'Build a working local coding agent from scratch',
-    chapterNums: ['00', '01', '03', '05', '07', '09', '14', '15', '17', '23'],
+    chapterNums: ['00', '01', '03', '05', '07', '09', '14', '15', '17', '23', '41'],
     accent: 'var(--mod-1)',
   },
   {
@@ -142,7 +142,7 @@ const READING_PATHS = [
     id: 'multi-agent',
     title: 'Multi-Agent & Platform',
     goal: 'Orchestrate swarms, plugins, IDEs, and evals',
-    chapterNums: ['19', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '37', '39', '40'],
+    chapterNums: ['19', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '37', '39', '40', '41'],
     accent: 'var(--mod-5)',
   },
 ];
@@ -151,7 +151,7 @@ const LABS = [
   {
     id: 'tool-loop',
     title: 'Live Tool-Use Loop Simulator',
-    subtitle: 'Step through a real multi-turn bug fix, inspect growing conversation arrays, stop reasons, and token cost.',
+    subtitle: 'Step through a 5-turn bug fix, watch the stateless message log grow turn by turn, and see how stop_reason drives the while loop.',
     chapterSlug: '01-agent-tool-use-loop',
     chapterNum: '01',
     badge: 'Core Loop',
@@ -168,8 +168,8 @@ const LABS = [
     id: 'context-compaction',
     title: 'Context Window Tank & Compaction Simulator',
     subtitle: 'Fill a 200k token desk with reads and test logs, trigger context rot zones, and compare micro vs. full compaction.',
-    chapterSlug: '09-context-window-budgeting',
-    chapterNum: '09',
+    chapterSlug: '10-context-compaction-and-summarization',
+    chapterNum: '10',
     badge: 'Context',
   },
   {
@@ -204,8 +204,6 @@ for (const lab of LABS) {
   list.push(lab.id);
   LABS_BY_CHAPTER.set(lab.chapterSlug, list);
 }
-// Also embed Context Tank lab inside Chapter 10!
-LABS_BY_CHAPTER.set('10-context-compaction-and-summarization', ['context-compaction']);
 
 const CHAPTER_SUMMARIES = {
   '00': 'Learn what an LLM actually is, why raw models fail at real coding tasks, and how the 7 layers of an agent harness turn text prediction into autonomous engineering.',

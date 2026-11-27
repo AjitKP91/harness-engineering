@@ -12,7 +12,7 @@ This chapter is about the **human-and-policy control plane**: how harnesses desi
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 Imagine hiring a capable personal assistant to manage your home office and business errands. You would never operate under either extreme:
 

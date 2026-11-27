@@ -12,7 +12,7 @@ Modern LLMs can request **multiple tool calls in a single turn**, and a well-eng
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 Imagine a busy restaurant kitchen with one head chef and a small kitchen crew.
 

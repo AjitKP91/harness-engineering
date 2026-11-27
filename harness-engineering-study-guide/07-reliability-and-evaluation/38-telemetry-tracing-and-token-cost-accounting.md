@@ -15,7 +15,7 @@ You cannot answer those questions by reading individual `.jsonl` files one by on
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 Think of running a busy commercial restaurant kitchen (scaled up to a chain of 50 restaurants):
 

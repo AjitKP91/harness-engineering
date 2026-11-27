@@ -12,7 +12,7 @@ If you hand the language model all 150 tool definitions and all 40 playbooks on 
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 ### The Master Mechanic's Workshop
 
@@ -73,7 +73,7 @@ When the user asks *"Open a GitHub pull request using our team's PR checklist"*,
 
 ---
 
-## 3. The Big Picture (Visual Diagram)
+## 3. The Big Picture
 
 Progressive disclosure unfolds across **three distinct stages**, moving from cheap awareness to full execution only when needed:
 

@@ -90,34 +90,6 @@ export function renderHomeView(root: HTMLElement, manifest: ManifestData): () =>
         </div>
       </section>
 
-      <section class="section-block" aria-labelledby="labs-heading">
-        <div class="section-header">
-          <div>
-            <h2 id="labs-heading" class="section-title">Hands-On Harness Simulators</h2>
-            <p class="section-subtitle">Experiment directly with caching, compaction, OS sandboxes, subagents, and evaluation math.</p>
-          </div>
-          <a class="btn-ghost btn-sm" href="#/labs">Open All Labs →</a>
-        </div>
-        <div class="labs-grid">
-          ${manifest.labs
-            .map(
-              (lab) => `
-            <a class="lab-showcase-card" href="#/chapter/${lab.chapterSlug}?lab=${lab.id}">
-              <div>
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                  <span class="badge badge-teal">${lab.badge}</span>
-                  <span class="chapter-num">Ch. ${lab.chapterNum}</span>
-                </div>
-                <h3 style="margin:0 0 8px;font-size:16.5px;">${lab.title}</h3>
-                <p style="margin:0 0 14px;font-size:13.5px;color:var(--ink-secondary);">${lab.subtitle}</p>
-              </div>
-              <span style="font-size:13px;font-weight:600;color:var(--teal);">Launch in Chapter ${lab.chapterNum} →</span>
-            </a>`
-            )
-            .join('')}
-        </div>
-      </section>
-
       <section class="section-block" aria-labelledby="curriculum-heading">
         <div class="section-header">
           <div>
@@ -165,6 +137,34 @@ export function renderHomeView(root: HTMLElement, manifest: ManifestData): () =>
                 </div>
               </div>`;
             })
+            .join('')}
+        </div>
+      </section>
+
+      <section class="section-block" aria-labelledby="labs-heading">
+        <div class="section-header">
+          <div>
+            <h2 id="labs-heading" class="section-title">Hands-On Harness Simulators</h2>
+            <p class="section-subtitle">Experiment directly with loops, caching, compaction, OS sandboxes, subagents, and evaluation math.</p>
+          </div>
+          <a class="btn-ghost btn-sm" href="#/labs">Open All Labs →</a>
+        </div>
+        <div class="labs-grid">
+          ${manifest.labs
+            .map(
+              (lab) => `
+            <a class="lab-showcase-card" href="#/chapter/${lab.chapterSlug}?lab=${lab.id}">
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                  <span class="badge badge-teal">${lab.badge}</span>
+                  <span class="chapter-num">Ch. ${lab.chapterNum}</span>
+                </div>
+                <h3 style="margin:0 0 8px;font-size:16.5px;">${lab.title}</h3>
+                <p style="margin:0 0 14px;font-size:13.5px;color:var(--ink-secondary);">${lab.subtitle}</p>
+              </div>
+              <span style="font-size:13px;font-weight:600;color:var(--teal);">Launch in Chapter ${lab.chapterNum} →</span>
+            </a>`
+            )
             .join('')}
         </div>
       </section>

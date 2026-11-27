@@ -10,7 +10,7 @@ You cannot just stop the session, and you cannot keep appending forever: soon th
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 Imagine a surgeon performing a six-hour operation, or a head chef working through a twelve-course banquet.
 

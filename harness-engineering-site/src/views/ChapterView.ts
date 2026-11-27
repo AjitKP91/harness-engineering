@@ -72,14 +72,17 @@ export function renderChapterView(
               <span class="meta-pill">${chapter.readingTime}</span>
               <span class="meta-pill">${chapter.wordCount.toLocaleString()} words</span>
             </div>
-            <div style="display:flex;gap:8px;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              ${
+                chapter.labIds.length > 0
+                  ? `<button type="button" class="btn-ghost btn-sm" id="jump-lab-btn">Interactive Lab ↓</button>`
+                  : ''
+              }
               <button type="button" class="btn-ghost btn-sm mobile-only" id="drawer-toggle-btn">Chapters</button>
               <button type="button" class="btn-ghost btn-sm" id="zen-toggle-btn">${isZen ? 'Exit Focus' : 'Focus Mode'}</button>
             </div>
           </div>
         </header>
-
-        <div id="chapter-labs-mount"></div>
 
         <div class="prose" id="chapter-prose">${chapter.html}</div>
 
@@ -139,19 +142,39 @@ export function renderChapterView(
   `;
 
   const cleanups: (() => void)[] = [];
+  const proseEl = root.querySelector<HTMLElement>('#chapter-prose')!;
 
-  // Mount interactive labs associated with this chapter
-  const labsMount = root.querySelector<HTMLElement>('#chapter-labs-mount')!;
-  for (const labId of chapter.labIds) {
-    const labDef = manifest.labs.find((l) => l.id === labId);
-    if (!labDef) continue;
-    const slot = document.createElement('div');
-    labsMount.appendChild(slot);
-    cleanups.push(mountLab(slot, labDef));
+  // Mount interactive labs inside Section 7 ("Build It Yourself: Mini-Lab")
+  // so first-time readers get the intuition and big picture before experimenting.
+  if (chapter.labIds.length > 0) {
+    const labsMount = document.createElement('div');
+    labsMount.id = 'chapter-labs-mount';
+    labsMount.className = 'inline-lab-mount';
+
+    const section7Heading = Array.from(proseEl.querySelectorAll<HTMLElement>('h2')).find((h) =>
+      h.id.startsWith('7-build-it-yourself')
+    );
+    if (section7Heading) {
+      section7Heading.insertAdjacentElement('afterend', labsMount);
+    } else {
+      proseEl.appendChild(labsMount);
+    }
+
+    for (const labId of chapter.labIds) {
+      const labDef = manifest.labs.find((l) => l.id === labId);
+      if (!labDef) continue;
+      const slot = document.createElement('div');
+      labsMount.appendChild(slot);
+      cleanups.push(mountLab(slot, labDef));
+    }
+
+    const jumpLabBtn = root.querySelector<HTMLButtonElement>('#jump-lab-btn');
+    jumpLabBtn?.addEventListener('click', () => {
+      labsMount.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   }
 
   // Render Mermaid diagrams + re-render when theme toggles
-  const proseEl = root.querySelector<HTMLElement>('#chapter-prose')!;
   void renderMermaidDiagrams(proseEl);
   const onThemeChange = () => {
     void renderMermaidDiagrams(proseEl);

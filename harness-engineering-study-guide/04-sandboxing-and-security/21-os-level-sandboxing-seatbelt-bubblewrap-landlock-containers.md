@@ -10,7 +10,7 @@ This chapter introduces the foundation of agent security: **OS-level sandboxing*
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 Imagine lending a bright intern the keys to your workshop so they can repair a wooden chair.
 

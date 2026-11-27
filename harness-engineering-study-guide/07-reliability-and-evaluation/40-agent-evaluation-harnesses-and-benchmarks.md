@@ -14,7 +14,7 @@ Welcome to the final chapter of this guide: **Agent Evaluation Harnesses & Bench
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 Imagine an automotive team redesigns the braking software on a new car. How do they test it?
 

@@ -12,7 +12,7 @@ This chapter teaches you how to build a harness that bends without breaking: rec
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 Imagine you are driving to a friend's house using a GPS navigation app. Along the way, **three totally different kinds of problems** can happen:
 

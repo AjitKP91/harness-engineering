@@ -12,7 +12,7 @@ The antidote is an **aviation black box** built into your harness: an **append-o
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 Think of an **airplane's flight data recorder** (the "black box") combined with a **chess game score sheet**.
 

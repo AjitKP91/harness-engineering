@@ -35,7 +35,7 @@ Without a loop, an LLM is a one-shot answering machine. You ask *"Why is `test_l
 In toy demos, the agent loop is an afterthought. In production coding agents, the loop directly controls four critical properties:
 
 - **Reliability (Task Completion):** Real software bugs rarely yield on the first try. A typical bug fix takes 6 to 25 loop iterations: searching files, reading code, running tests, discovering a surprise, adjusting the patch, and re-testing.
-- **Cost Control:** Because you resend the conversation history on every turn, a runaway loop does not grow linearly in cost; it grows **quadratically** ($1 + 2 + 3 + \dots + N \approx N^2/2$ tokens read if prompt caching misses). A missing stop check can burn through an entire API budget in two minutes.
+- **Cost Control:** Because you resend the conversation history on every turn, a runaway loop does not grow linearly in cost; it grows **quadratically** ($1 + 2 + 3 + \dots + N \approx N^2/2$ tokens read unless later optimizations like prompt caching in Chapter 08 reuse the shared prefix). A missing stop check can burn through an entire API budget in two minutes.
 - **Responsiveness & Human Control:** Humans change their minds mid-task (*"Wait; don't touch the database migration yet, check the tests first!"*). If your loop locks out the user until the model finishes 15 steps, the harness feels sluggish and frustrating.
 - **Conversation Integrity:** Model APIs enforce strict grammar rules on message histories (for instance, every tool request must be paired with a matching tool result). A sloppy loop that breaks out early on `max_tokens` or a `Ctrl+C` leaves corrupted history that causes every subsequent API call to fail with `400 Bad Request`.
 

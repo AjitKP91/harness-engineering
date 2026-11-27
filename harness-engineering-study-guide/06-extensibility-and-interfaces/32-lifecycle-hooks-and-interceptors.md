@@ -12,7 +12,7 @@ If you have ever used a coding agent for more than an hour, you already know wha
 
 ---
 
-## 1. The Simple Idea (Zero-Jargon Intuition)
+## 1. The Simple Idea
 
 Think of a modern **factory assembly line** (or **airport security**):
 
